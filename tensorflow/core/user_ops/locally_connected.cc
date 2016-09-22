@@ -87,8 +87,8 @@ class LocConnOp : public OpKernel {
         return;
       }
 
-      int h_stride = (in_height - filter_height + 1)/out_height;
-      int w_stride = (in_width - filter_width + 1)/out_width;
+      float h_stride = (in_height - filter_height + 1.)/out_height;
+      float w_stride = (in_width - filter_width + 1.)/out_width;
 
       for (int b=0; b<batch; b++) {
         for (int k=0; k<out_depth; k++) {
@@ -98,10 +98,13 @@ class LocConnOp : public OpKernel {
               for (int fi=0; fi<filter_height; fi++) {
                 for (int fj=0; fj<filter_width; fj++) {
                   for (int fk=0; fk<in_depth; fk++) {
-                    sum += 
+                    int in_i = h_stride * i + fi;
+                    int in_j = w_stride * j + fj;
+                    sum += filter.tensor<float, 6>()(i, j, fi, fj, fk, k) * input.tensor<float, 4>()(b, in_i, in_j, fk);
                   }
                 }
               }
+              output->tensor<float, 4>()(b, i, j, k) = sum;
             }
           }
         }

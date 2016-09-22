@@ -41,6 +41,7 @@ py_tests(
         "io_ops_test.py",
         "listdiff_op_test.py",
         "logging_ops_test.py",
+        "locally_connected_test.py",
         "matrix_inverse_op_test.py",
         "matrix_solve_ls_op_test.py",
         "matrix_solve_op_test.py",
