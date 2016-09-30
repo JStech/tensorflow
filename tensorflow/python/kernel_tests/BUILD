@@ -41,7 +41,6 @@ py_tests(
         "io_ops_test.py",
         "listdiff_op_test.py",
         "logging_ops_test.py",
-        "locally_connected_test.py",
         "matrix_inverse_op_test.py",
         "matrix_solve_ls_op_test.py",
         "matrix_solve_op_test.py",
@@ -93,6 +92,16 @@ tf_py_test(
     size = "medium",
     srcs = ["diag_op_test.py"],
     shard_count = 2,
+)
+
+py_tests(
+    name = "locally_connected_test",
+    size = "small",
+    srcs = ["locally_connected_test.py"],
+    # additional_deps = ["//tensorflow/core/user_ops:locally_connected.so"]
+    # can't figure out how to make ^^^ work, so using "external" instead to
+    # prevent caching
+    tags = ["external"],
 )
 
 py_tests(
