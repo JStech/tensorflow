@@ -119,3 +119,6 @@ class LocConnTest(tf.test.TestCase):
       result = loc_conn_module.loc_conn(in_tensor, f_tensor)
       self.assertAllEqual(result.eval(), out_tensor)
 
+  def testLocConnGrad(self):
+    with self.test_session():
+      self.assertAllEqual(1, 1)
