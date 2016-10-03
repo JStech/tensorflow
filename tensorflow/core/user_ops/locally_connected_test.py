@@ -47,9 +47,9 @@ class LocConnTest(tf.test.TestCase):
     with self.test_session():
       # a test I can wrap my head around
       result = loc_conn_module.loc_conn(t, f)
-      self.assertAllEqual(result.eval(), [
+      self.assertAllEqual(result.eval(), [[
         [[6.], [6.]],
-        [[6.], [6.]]])
+        [[6.], [6.]]]])
 
       # a test I cannot
       batch = 4
@@ -69,7 +69,7 @@ class LocConnTest(tf.test.TestCase):
               [
                 [
                   [
-                    random.rand() + 0.1
+                    random.random() + 0.1
                     for _ in range(out_channels)]
                   for _ in range(in_channels)]
                 for _ in range(filter_width)]
@@ -82,7 +82,7 @@ class LocConnTest(tf.test.TestCase):
           [
             [
               [
-                random.rand() * 10 - 5
+                random.random() * 10 - 5
                 for _ in range(in_channels)]
               for _ in range(in_width)]
             for _ in range(in_height)]
@@ -99,26 +99,29 @@ class LocConnTest(tf.test.TestCase):
             for _ in range(out_height)]
           for _ in range(batch)]
 
-      h_stride = (in_height - filter_height + 1)/out_height
-      w_stride = (in_width - filter_width + 1)/out_width
-      h_pos = [math.ceil(h_stride * i) for i in range(out_height)]
-      w_pos = [math.ceil(w_stride * i) for i in range(out_width)]
+      h_stride = 1.*(in_height - filter_height + 1)/out_height
+      w_stride = 1.*(in_width - filter_width + 1)/out_width
+      h_pos = [int(math.ceil(h_stride * i)) for i in range(out_height)]
+      w_pos = [int(math.ceil(w_stride * i)) for i in range(out_width)]
 
       for b in range(batch):
         for i in range(out_height):
           for j in range(out_width):
             for k in range(out_channels):
               # apply the appropriate filter
-              for f_i in range(out_height):
-                for f_j in range(out_width):
+              for f_i in range(filter_height):
+                for f_j in range(filter_width):
                   for f_k in range(in_channels):
                     out_tensor[b][i][j][k] += (f_tensor[i][j][f_i][f_j][f_k][k] *
                         in_tensor[b][f_i + h_pos[i]][f_j + w_pos[j]][f_k])
 
       # run test
       result = loc_conn_module.loc_conn(in_tensor, f_tensor)
-      self.assertAllEqual(result.eval(), out_tensor)
+      self.assertAllClose(result.eval(), out_tensor)
 
   def testLocConnGrad(self):
     with self.test_session():
       self.assertAllEqual(1, 1)
+
+if __name__ == "__main__":
+  tf.test.main()

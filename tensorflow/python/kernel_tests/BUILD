@@ -95,16 +95,6 @@ tf_py_test(
 )
 
 py_tests(
-    name = "locally_connected_test",
-    size = "small",
-    srcs = ["locally_connected_test.py"],
-    # additional_deps = ["//tensorflow/core/user_ops:locally_connected.so"]
-    # can't figure out how to make ^^^ work, so using "external" instead to
-    # prevent caching
-    tags = ["external"],
-)
-
-py_tests(
     name = "reader_ops_test",
     size = "small",
     srcs = ["reader_ops_test.py"],
