@@ -120,8 +120,8 @@ class LocConnOp : public OpKernel {
               double sum = 0.;
               for (int fi=0; fi<filter_height; fi++) {
                 for (int fj=0; fj<filter_width; fj++) {
-                  int in_i = h_stride * i + fi;
-                  int in_j = w_stride * j + fj;
+                  int in_i = ceil(h_stride * i + fi);
+                  int in_j = ceil(w_stride * j + fj);
                   for (int fk=0; fk<in_depth; fk++) {
                     sum += filter.tensor<float, 6>()(i, j, fi, fj, fk, k) * input.tensor<float, 4>()(b, in_i, in_j, fk);
                   }
@@ -186,18 +186,18 @@ class LocConnGradOp : public OpKernel {
         for (int i=0; i<in_height; i++) {
           for (int j=0; j<in_width; j++) {
             for (int k=0; k<in_channels; k++) {
-              gradient_input->tensor<float, 4>()(b, i, j, k) = 0;
+              gradient_input->tensor<float, 4>()(b, i, j, k) = 0.;
             }
           }
         }
       }
-      // filter gradient
+      // calculate gradients
       for (int i=0; i<out_height; i++) {
         for (int j=0; j<out_width; j++) {
           for (int fi=0; fi<filter_height; fi++) {
             for (int fj=0; fj<filter_width; fj++) {
-              int in_i = h_stride * i + fi;
-              int in_j = w_stride * j + fj;
+              int in_i = ceil(h_stride * i + fi);
+              int in_j = ceil(w_stride * j + fj);
               for (int fk=0; fk<in_channels; fk++) {
                 for (int k=0; k<out_channels; k++) {
                   double sum = 0.;
@@ -205,7 +205,7 @@ class LocConnGradOp : public OpKernel {
                     sum +=
                       gradients.tensor<float, 4>()(b, i, j, k) *
                       input.tensor<float, 4>()(b, in_i, in_j, fk);
-                    gradient_input->tensor<float, 4>()(b, in_i, in_j, k) +=
+                    gradient_input->tensor<float, 4>()(b, in_i, in_j, fk) +=
                       gradients.tensor<float, 4>()(b, i, j, k) *
                       filter.tensor<float, 6>()(i, j, fi, fj, fk, k);
                   }
@@ -232,6 +232,14 @@ REGISTER_KERNEL_BUILDER(Name("LocConn")
     .Device(DEVICE_CPU)
     .TypeConstraint<double>("T"),
     LocConnOp);
+REGISTER_KERNEL_BUILDER(Name("LocConnGrad")
+    .Device(DEVICE_CPU)
+    .TypeConstraint<float>("T"),
+    LocConnGradOp);
+REGISTER_KERNEL_BUILDER(Name("LocConnGrad")
+    .Device(DEVICE_CPU)
+    .TypeConstraint<double>("T"),
+    LocConnGradOp);
 
 }
 
