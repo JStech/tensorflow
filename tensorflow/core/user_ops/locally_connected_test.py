@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 import random
 import math
+import numpy as np
 
 
 # a single 4x4 image with 1 channel
@@ -201,6 +202,53 @@ class LocConnTest(tf.test.TestCase):
           [f_tensor, in_tensor], [f_shape, i_shape], result, o_shape)
       self.assertAllClose(grads[0][0], grads[0][1], rtol=1e-3, atol=1e-3)
       self.assertAllClose(grads[1][0], grads[1][1], rtol=1e-3, atol=1e-3)
+
+  def testLocConnTrainVerySimple(self):
+    '''very simple training test'''
+    input_size = [5, 4]
+    output_size = [3, 2]
+    filter_size = [3, 3]
+    batch_size = 1000
+    total_batches = 1000
+
+    def f(i_img):
+      '''very simple function we're trying to learn'''
+      o_img = (
+          i_img[0:output_size[0], 0:output_size[1]] +
+          i_img[input_size[0]-output_size[0]:, 0:output_size[1]] +
+          i_img[0:output_size[0], input_size[1]-output_size[1]:] +
+          i_img[input_size[0]-output_size[0]:, input_size[1]-output_size[1]:])
+      return o_img
+
+    out_t = np.zeros([output_size[0], output_size[1], filter_size[0],
+      filter_size[1], 1, 1])
+    for i in range(output_size[0]):
+      for j in range(output_size[1]):
+        for fi in range(filter_size[0]):
+          for fj in range(filter_size[1]):
+            if fi in (0, 2) and fj in (0, 2):
+              out_t[i][j][fi][fj][0][0] = 1.
+
+    with self.test_session():
+      x = tf.placeholder(tf.float32, shape=(None, input_size[0], input_size[1], 1))
+      filter_t = tf.Variable(tf.truncated_normal(
+        [output_size[0], output_size[1], filter_size[0], filter_size[1], 1, 1],
+        stddev=0.2))
+      y = loc_conn_module.loc_conn(x, filter_t)
+
+      y_ = tf.placeholder(tf.float32, shape=(None, output_size[0], output_size[1], 1))
+
+      sqrerr = tf.reduce_mean(tf.squared_difference(y, y_))
+      train_step = tf.train.GradientDescentOptimizer(0.5).minimize(sqrerr)
+
+      tf.initialize_all_variables().run()
+
+      for i in range(total_batches):
+        batch_xs = np.random.rand(batch_size, input_size[0], input_size[1], 1)
+        batch_ys = np.asarray([f(xs) for xs in batch_xs])
+        #batch_ys = np.expand_dims(batch_ys, 3)
+        train_step.run({x:batch_xs, y_:batch_ys})
+      self.assertAllClose(filter_t.eval(), out_t, rtol=1e-5, atol=1e-5)
 
 if __name__ == "__main__":
   tf.test.main()
