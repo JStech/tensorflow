@@ -6,8 +6,7 @@ load("//tensorflow:tensorflow.bzl", "cuda_py_test")
 
 tf_custom_op_library(
     name = "locally_connected.so",
-    srcs = ["locally_connected.cc",
-            "//tensorflow/core/kernels:transpose_functor.h"],
+    srcs = ["locally_connected.cc"]
     )
 
 py_tests(

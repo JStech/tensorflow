@@ -1,6 +1,5 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/op_kernel.h"
-#include "tensorflow/core/kernels/transpose_functor.h"
 
 namespace tensorflow {
 
@@ -88,9 +87,6 @@ class LocConnOp : public OpKernel {
       // filter dimensions
       const int filter_height = static_cast<int>(filter.dim_size(2));
       const int filter_width = static_cast<int>(filter.dim_size(3));
-
-      // flatten filter over filter height/width and input channels
-      Tensor* flat_filter;
 
       // Create an output tensor
       Tensor* output = NULL;
