@@ -22,6 +22,7 @@ import math
 import os.path
 import time
 import contextlib
+import random
 import shutil
 import tempfile
 
@@ -34,9 +35,11 @@ from google.protobuf.any_pb2 import Any
 from tensorflow.core.framework import graph_pb2
 from tensorflow.core.protobuf import meta_graph_pb2
 from tensorflow.core.protobuf import queue_runner_pb2
+from tensorflow.core.protobuf import saver_pb2
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import function
 from tensorflow.python.ops import gen_data_flow_ops
+from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.platform import gfile
 from tensorflow.python.training import saver as saver_module
 from tensorflow.python.util import compat
@@ -184,6 +187,14 @@ class SaverTest(tf.test.TestCase):
       self.assertEqual(20.0, v1_2.eval())
       self.assertEqual(b"k1", v2_2.keys().eval())
       self.assertEqual(30.0, v2_2.values().eval())
+
+  def testInvalidPath(self):
+    v0 = tf.Variable(0, name="v0")
+    with self.test_session() as sess:
+      save = tf.train.Saver({"v0": v0})
+      with self.assertRaisesRegexp(ValueError,
+                                   "^Restore called with invalid save path.*"):
+        save.restore(sess, "invalid path")
 
   def testInt64(self):
     save_path = os.path.join(self.get_temp_dir(), "int64")
@@ -338,6 +349,17 @@ class SaverTest(tf.test.TestCase):
     # The cached readers should know to re-read the file.
     self._SaveAndLoad("var1", 1.1, 2.2, save_path)
 
+  def testAllowEmpty(self):
+    save_path = os.path.join(self.get_temp_dir(), "allow_empty")
+    with self.test_session() as sess:
+      _ = tf.constant(1)
+      save = tf.train.Saver(allow_empty=True)
+      val = save.save(sess, save_path)
+      self.assertIsNone(val)
+    with self.test_session() as sess:
+      save = tf.train.Saver(allow_empty=True)
+      save.restore(sess, save_path)
+
   def testGPU(self):
     if not tf.test.is_gpu_available():
       return
@@ -442,7 +464,7 @@ class SaverTest(tf.test.TestCase):
       save.restore(sess, save_path)
       self.assertAllClose([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], var.eval())
 
-  def testSaveWithGlobalStep(self):
+  def testSaveWithGlobalStep(self, pad_step_number=False):
     save_path = os.path.join(self.get_temp_dir(), "ckpt_with_global_step")
     global_step_int = 5
     # Save and reload one Variable named "var0".
@@ -450,15 +472,25 @@ class SaverTest(tf.test.TestCase):
     for use_tensor in [True, False]:
       with self.test_session() as sess:
         var = tf.Variable(1.0, name="var0")
-        save = tf.train.Saver({var.op.name: var})
+        save = tf.train.Saver(
+            {
+                var.op.name: var
+            }, pad_step_number=pad_step_number)
         var.initializer.run()
         if use_tensor:
           global_step = tf.constant(global_step_int)
           val = save.save(sess, save_path, global_step=global_step)
         else:
           val = save.save(sess, save_path, global_step=global_step_int)
-        expected_save_path = "%s-%d" % (save_path, global_step_int)
+        if pad_step_number:
+          expected_save_path = "%s-%s" % (save_path,
+                                          "{:08d}".format(global_step_int))
+        else:
+          expected_save_path = "%s-%d" % (save_path, global_step_int)
         self.assertEqual(expected_save_path, val)
+
+  def testSaveWithGlobalStepWithPadding(self):
+    self.testSaveWithGlobalStep(pad_step_number=True)
 
   def testSaveToNonexistingPath(self):
 
@@ -482,7 +514,7 @@ class SaverTest(tf.test.TestCase):
       # Assert saving fails when parent dir of save path doesn't exist
       with self.assertRaisesWithPredicateMatch(
         ValueError, lambda e:  "Parent directory of {} doesn't exist, can't save.".format(save_path) in str(e)):
-          save.save(sess, save_path)
+        save.save(sess, save_path)
 
 
 class SaveRestoreShardedTest(tf.test.TestCase):
@@ -1200,7 +1232,13 @@ class MetaGraphTest(tf.test.TestCase):
     filename = os.path.join(test_dir, "metafile")
     with self.test_session():
       # Creates a graph.
-      v0 = tf.Variable(10.0, name="v0")
+      v0 = tf.Variable(1.0, name="v0")
+      control_flow_ops.cond(tf.less(v0, 10),
+                            lambda: tf.add(v0, 1),
+                            lambda: tf.sub(v0, 1))
+      control_flow_ops.while_loop(lambda i: tf.less(i, 10),
+                                  lambda i: tf.add(i, 1),
+                                  [v0])
       var = tf.Variable(tf.constant(0, dtype=tf.int64))
       count_up_to = var.count_up_to(3)
       input_queue = tf.FIFOQueue(30, tf.float32, shared_name="collection_queue")
@@ -1229,7 +1267,7 @@ class MetaGraphTest(tf.test.TestCase):
       self.assertTrue(meta_graph_def.HasField("saver_def"))
       self.assertTrue(meta_graph_def.HasField("graph_def"))
       collection_def = meta_graph_def.collection_def
-      self.assertEqual(len(collection_def), 10)
+      self.assertEqual(len(collection_def), 12)
 
     with tf.Graph().as_default():
       # Restores from MetaGraphDef.
@@ -1407,7 +1445,13 @@ class MetaGraphTest(tf.test.TestCase):
           tf.truncated_normal([28, 128],
                               stddev=1.0 / math.sqrt(float(28))),
           name="weights")
-      biases = tf.Variable(tf.zeros([128]),
+      # The use of control_flow_ops.cond here is purely for adding test coverage
+      # the save and restore of control flow context (which doesn't make any
+      # sense here from a machine learning perspective).  The typical biases is
+      # a simple Variable without the conditions.
+      biases = tf.Variable(control_flow_ops.cond(tf.less(random.random(), 0.5),
+                                                 lambda: tf.ones([128]),
+                                                 lambda: tf.zeros([128])),
                            name="biases")
       hidden1 = tf.nn.relu(tf.matmul(images, weights) + biases)
     # Hidden 2
@@ -1416,8 +1460,19 @@ class MetaGraphTest(tf.test.TestCase):
           tf.truncated_normal([128, 32],
                               stddev=1.0 / math.sqrt(float(128))),
           name="weights")
-      biases = tf.Variable(tf.zeros([32]),
-                           name="biases")
+
+      # The use of control_flow_ops.while_loop here is purely for adding test
+      # coverage the save and restore of control flow context (which doesn't
+      # make any sense here from a machine learning perspective).  The typical
+      # biases is a simple Variable without the conditions.
+      def loop_cond(it, _):
+        return it < 2
+      def loop_body(it, biases):
+        biases += tf.constant(0.1, shape=[32])
+        return it + 1, biases
+      _, biases = control_flow_ops.while_loop(
+          loop_cond, loop_body,
+          [tf.constant(0), tf.Variable(tf.zeros([32]))])
       hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases)
     # Linear
     with tf.name_scope("softmax_linear"):
@@ -1445,6 +1500,7 @@ class MetaGraphTest(tf.test.TestCase):
   def _testGraphExtensionRestore(self):
     test_dir = os.path.join(self.get_temp_dir(), "graph_extension")
     filename = os.path.join(test_dir, "metafile")
+    train_filename = os.path.join(test_dir, "train_metafile")
     saver0_ckpt = os.path.join(test_dir, "saver0.ckpt")
     with self.test_session(graph=tf.Graph()) as sess:
       # Restores from MetaGraphDef.
@@ -1473,11 +1529,30 @@ class MetaGraphTest(tf.test.TestCase):
 
       # Runs train_op.
       train_op = optimizer.minimize(loss)
+      tf.add_to_collection("train_op", train_op)
+
+      # Runs train_op.
+      sess.run(train_op)
+
+      # Generates MetaGraphDef.
+      tf.train.export_meta_graph(train_filename)
+
+  def _testRestoreFromTrainGraphWithControlContext(self):
+    test_dir = os.path.join(self.get_temp_dir(), "graph_extension")
+    train_filename = os.path.join(test_dir, "train_metafile")
+    saver0_ckpt = os.path.join(test_dir, "saver0.ckpt")
+    with self.test_session(graph=tf.Graph()) as sess:
+      # Restores from MetaGraphDef.
+      new_saver = tf.train.import_meta_graph(train_filename)
+      # Restores from checkpoint.
+      new_saver.restore(sess, saver0_ckpt)
+      train_op = tf.get_collection("train_op")[0]
       sess.run(train_op)
 
   def testGraphExtension(self):
     self._testGraphExtensionSave()
     self._testGraphExtensionRestore()
+    self._testRestoreFromTrainGraphWithControlContext()
 
   def testStrippedOpListDef(self):
     with self.test_session():
@@ -1485,7 +1560,7 @@ class MetaGraphTest(tf.test.TestCase):
       v0 = tf.Variable(0.0)
       var = tf.Variable(10.0)
       tf.add(v0, var)
-      @function.Defun(x=tf.float32)
+      @function.Defun(tf.float32)
       def minus_one(x):
         return x - 1
       minus_one(tf.identity(v0))
@@ -1496,7 +1571,7 @@ class MetaGraphTest(tf.test.TestCase):
       meta_graph_def = save.export_meta_graph()
       ops = [o.name for o in meta_graph_def.meta_info_def.stripped_op_list.op]
       self.assertEqual(ops, ["Add", "Assign", "Const", "Identity", "NoOp",
-                             "RestoreSlice", "SaveSlices", "Sub", "Variable"])
+                             "RestoreV2", "SaveSlices", "Sub", "Variable"])
 
       # Test calling stripped_op_list_for_graph directly
       op_list = tf.contrib.util.stripped_op_list_for_graph(
@@ -1509,12 +1584,12 @@ class MetaGraphTest(tf.test.TestCase):
   def testStrippedOpListNestedFunctions(self):
     with self.test_session():
       # Square two levels deep
+      @function.Defun(tf.int32)
       def f0(x):
         return tf.square(x)
-      f0 = function.define_function(f0, {"x": tf.int32})
+      @function.Defun(tf.int32)
       def f1(x):
-        return function.call_function(f0, x)
-      f1 = function.define_function(f1, {"x": tf.int32})
+        return f0(x)
 
       # At this point we've defined two functions but haven't called them, so
       # there should be no used ops.
@@ -1523,7 +1598,7 @@ class MetaGraphTest(tf.test.TestCase):
       self.assertEquals(len(op_list.op), 0)
 
       # If we call the function on a constant, there should be two ops
-      function.call_function(f1, tf.constant(7))
+      _ = f1(tf.constant(7))
       op_list = tf.contrib.util.stripped_op_list_for_graph(
           tf.get_default_graph().as_graph_def())
       self.assertEquals(["Const", "Square"], [op.name for op in op_list.op])
@@ -1550,14 +1625,19 @@ class MetaGraphTest(tf.test.TestCase):
 
 class CheckpointReaderTest(tf.test.TestCase):
 
+  _WRITE_VERSION = saver_pb2.SaverDef.V1
+
   def testDebugString(self):
     # Builds a graph.
     v0 = tf.Variable([[1, 2, 3], [4, 5, 6]], dtype=tf.float32, name="v0")
     v1 = tf.Variable([[[1], [2]], [[3], [4]], [[5], [6]]], dtype=tf.float32,
                      name="v1")
     init_all_op = tf.initialize_all_variables()
-    save = tf.train.Saver({"v0": v0, "v1": v1})
-    save_path = os.path.join(self.get_temp_dir(), "ckpt_for_debug_string")
+    save = tf.train.Saver(
+        {"v0": v0,
+         "v1": v1}, write_version=self._WRITE_VERSION)
+    save_path = os.path.join(self.get_temp_dir(),
+                             "ckpt_for_debug_string" + str(self._WRITE_VERSION))
     with self.test_session() as sess:
       sess.run(init_all_op)
       # Saves a checkpoint.
@@ -1583,7 +1663,7 @@ class CheckpointReaderTest(tf.test.TestCase):
       self.assertAllEqual(v1.eval(), v1_tensor)
       # Verifies get_tensor() fails for non-existent tensors.
       with self.assertRaisesRegexp(errors.NotFoundError,
-                                   "v3 not found in checkpoint file"):
+                                   "v3 not found in checkpoint"):
         reader.get_tensor("v3")
 
   def testNonexistentPath(self):
@@ -1592,13 +1672,65 @@ class CheckpointReaderTest(tf.test.TestCase):
       tf.train.NewCheckpointReader("non-existent")
 
 
+class CheckpointReaderForV2Test(CheckpointReaderTest):
+
+  _WRITE_VERSION = saver_pb2.SaverDef.V2
+
+
 class WriteGraphTest(tf.test.TestCase):
+
+  def testWriteGraph(self):
+    test_dir = _TestDir("write_graph_dir")
+    tf.Variable([[1, 2, 3], [4, 5, 6]], dtype=tf.float32, name="v0")
+    tf.train.write_graph(tf.get_default_graph(),
+                         "/".join([test_dir, "l1"]), "graph.pbtxt")
 
   def testRecursiveCreate(self):
     test_dir = _TestDir("deep_dir")
     tf.Variable([[1, 2, 3], [4, 5, 6]], dtype=tf.float32, name="v0")
     tf.train.write_graph(tf.get_default_graph().as_graph_def(),
                          "/".join([test_dir, "l1/l2/l3"]), "graph.pbtxt")
+
+
+class SaverUtilsTest(tf.test.TestCase):
+
+  def setUp(self):
+    self._base_dir = os.path.join(self.get_temp_dir(), "saver_utils_test")
+    gfile.MakeDirs(self._base_dir)
+
+  def tearDown(self):
+    gfile.DeleteRecursively(self._base_dir)
+
+  def testCheckpointExists(self):
+    for sharded in (False, True):
+      for version in (tf.train.SaverDef.V2, tf.train.SaverDef.V1):
+        with self.test_session(graph=tf.Graph()) as sess:
+          unused_v = tf.Variable(1.0, name="v")
+          tf.initialize_all_variables().run()
+          saver = tf.train.Saver(sharded=sharded, write_version=version)
+
+          path = os.path.join(self._base_dir, "%s-%s" % (sharded, version))
+          self.assertFalse(tf.train.checkpoint_exists(path))  # Not saved yet.
+
+          ckpt_prefix = saver.save(sess, path)
+          self.assertTrue(tf.train.checkpoint_exists(ckpt_prefix))
+
+          ckpt_prefix = tf.train.latest_checkpoint(self._base_dir)
+          self.assertTrue(tf.train.checkpoint_exists(ckpt_prefix))
+
+  def testGetCheckpointMtimes(self):
+    prefixes = []
+    for version in (tf.train.SaverDef.V2, tf.train.SaverDef.V1):
+      with self.test_session(graph=tf.Graph()) as sess:
+        unused_v = tf.Variable(1.0, name="v")
+        tf.initialize_all_variables().run()
+        saver = tf.train.Saver(write_version=version)
+        prefixes.append(
+            saver.save(sess, os.path.join(self._base_dir, str(version))))
+
+    mtimes = tf.train.get_checkpoint_mtimes(prefixes)
+    self.assertEqual(2, len(mtimes))
+    self.assertTrue(mtimes[1] >= mtimes[0])
 
 
 if __name__ == "__main__":

@@ -41,19 +41,19 @@ class StripUnusedTest(test_util.TensorFlowTestCase):
       sess = tf.Session()
       output = sess.run(output_node)
       self.assertNear(-4.0, output, 0.00001)
-      tf.train.write_graph(sess.graph.as_graph_def(), self.get_temp_dir(),
-                           input_graph_name)
+      tf.train.write_graph(sess.graph, self.get_temp_dir(), input_graph_name)
 
     # We save out the graph to disk, and then call the const conversion
     # routine.
     input_graph_path = os.path.join(self.get_temp_dir(), input_graph_name)
     input_binary = False
     input_node_names = "wanted_input_node"
+    output_binary = True
     output_node_names = "output_node"
     output_graph_path = os.path.join(self.get_temp_dir(), output_graph_name)
 
     strip_unused_lib.strip_unused_from_files(input_graph_path, input_binary,
-                                             output_graph_path,
+                                             output_graph_path, output_binary,
                                              input_node_names,
                                              output_node_names,
                                              tf.float32.as_datatype_enum)
@@ -70,6 +70,8 @@ class StripUnusedTest(test_util.TensorFlowTestCase):
       for node in output_graph_def.node:
         self.assertNotEqual("Add", node.op)
         self.assertNotEqual("Sub", node.op)
+        if node.name == input_node_names:
+          self.assertTrue("shape" in node.attr)
 
       with tf.Session() as sess:
         input_node = sess.graph.get_tensor_by_name("wanted_input_node:0")

@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.core.framework import attr_value_pb2
 from tensorflow.python.framework import common_shapes
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import device as pydev
@@ -30,11 +31,23 @@ from tensorflow.python.framework import test_util
 from tensorflow.python.framework import versions
 # Import gradients to register _IndexedSlicesToTensor.
 from tensorflow.python.ops import control_flow_ops
-import tensorflow.python.ops.gradients  # pylint: disable=unused-import
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import variables
+import tensorflow.python.ops.gradients  # pylint: disable=unused-import
 from tensorflow.python.platform import googletest
+from tensorflow.python.util import compat
+
+ops.RegisterShape("ResourceOp")(None)
+ops.RegisterShape("ResourceUsingOp")(None)
+
+
+class ResourceTest(test_util.TensorFlowTestCase):
+
+  def testBuildGraph(self):
+    with self.test_session():
+      pt = test_ops.resource_op(container="a", shared_name="b")
+      test_ops.resource_using_op(pt).run()
 
 
 class TensorTest(test_util.TensorFlowTestCase):
@@ -66,7 +79,8 @@ class SparseTensorTest(test_util.TensorFlowTestCase):
     sp_value = ops.SparseTensorValue(indices, values, shape)
     for sp in [
         ops.SparseTensor(indices, values, shape),
-        ops.SparseTensor.from_value(sp_value)]:
+        ops.SparseTensor.from_value(sp_value),
+        ops.SparseTensor.from_value(ops.SparseTensor(indices, values, shape))]:
       self.assertEqual(sp.indices.dtype, dtypes.int64)
       self.assertEqual(sp.values.dtype, dtypes.string)
       self.assertEqual(sp.shape.dtype, dtypes.int64)
@@ -267,21 +281,77 @@ class OperationTest(test_util.TensorFlowTestCase):
       ops.Operation(ops._NodeDef("op", "invalid:0"), g)
 
   def testShapeFunctionAbsence(self):
-    def _test():
-      pass
     g = ops.Graph()
     with self.assertRaises(RuntimeError):
       g.create_op("shapeless_op", [], [dtypes.float32])
 
   def testNoShapeFunction(self):
     g = ops.Graph()
-    op = ops.Operation(ops._NodeDef("op", "an_op"), g,
-                       output_types = [dtypes.float32])
+    ops.Operation(ops._NodeDef("op", "an_op"), g,
+                  output_types=[dtypes.float32])
     self.assertEqual(tensor_shape.unknown_shape(),
                      _apply_op(g, "an_op", [], [dtypes.float32]).get_shape())
 
+  def testConvertToTensorNestedArray(self):
+    with self.test_session():
+      values = [[2], [3], [5], [7]]
+      tensor = ops.convert_to_tensor(values)
+      self.assertAllEqual((4, 1), tensor.get_shape().as_list())
+      self.assertAllEqual(values, tensor.eval())
+
+  def testConvertToTensorNestedTuple(self):
+    with self.test_session():
+      values = ((2,), (3,), (5,), (7,))
+      tensor = ops.convert_to_tensor(values)
+      self.assertAllEqual((4, 1), tensor.get_shape().as_list())
+      self.assertAllEqual(values, ops.convert_to_tensor(values).eval())
+
+  def testConvertToTensorNestedTensors(self):
+    with self.test_session():
+      values = ((2,), (3,), (5,), (7,))
+      tensor = ops.convert_to_tensor(
+          [constant_op.constant(row) for row in values])
+      self.assertAllEqual((4, 1), tensor.get_shape().as_list())
+      self.assertAllEqual(values, tensor.eval())
+      tensor = ops.convert_to_tensor(
+          [[constant_op.constant(v) for v in row] for row in values])
+      self.assertAllEqual((4, 1), tensor.get_shape().as_list())
+      self.assertAllEqual(values, tensor.eval())
+
+  def testConvertToTensorNestedMix(self):
+    with self.test_session():
+      values = ([2], (3,), [constant_op.constant(5)], constant_op.constant([7]))
+      tensor = ops.convert_to_tensor(values)
+      self.assertAllEqual((4, 1), tensor.get_shape().as_list())
+      self.assertAllEqual(((2,), (3,), (5,), (7,)), tensor.eval())
+
+  def testConvertToTensorPreferred(self):
+    with self.test_session():
+      values = [2, 3, 5, 7]
+      tensor = ops.convert_to_tensor(values, preferred_dtype=dtypes.float32)
+      self.assertEqual(dtypes.float32, tensor.dtype)
+
+    with self.test_session():
+      # Convert empty tensor to anything.
+      values = []
+      tensor = ops.convert_to_tensor(values, preferred_dtype=dtypes.int64)
+      self.assertEqual(dtypes.int64, tensor.dtype)
+
+    with self.test_session():
+      # The preferred dtype is a type error and will convert to
+      # float32 instead.
+      values = [1.23]
+      tensor = ops.convert_to_tensor(values, preferred_dtype=dtypes.int64)
+      self.assertEqual(dtypes.float32, tensor.dtype)
+
+  def testConvertToInvalidTensorType(self):
+    with self.assertRaises(TypeError):
+      # Forcing an invalid dtype should fail with a type error.
+      values = [1.23]
+      _ = ops.convert_to_tensor(values, dtype=dtypes.int64)
+
   def testNoConvert(self):
-    # Operation cannot be converted to Tensor
+    # Operation cannot be converted to Tensor.
     op = control_flow_ops.no_op()
     with self.assertRaisesRegexp(TypeError,
                                  r"Can't convert Operation '.*' to Tensor"):
@@ -335,6 +405,10 @@ class CreateOpTest(test_util.TensorFlowTestCase):
     g.finalize()
     with self.assertRaises(RuntimeError):
       g.create_op("const", [], [dtypes.float32], None, name="myop1")
+
+    # Test unfinalize.
+    g._unsafe_unfinalize()
+    g.create_op("const", [], [dtypes.float32], None, name="myop1")
 
 
 class ApplyOpTest(test_util.TensorFlowTestCase):
@@ -879,7 +953,7 @@ def an_op(g):
   return _apply_op(g, "an_op", [], [dtypes.float32])
 
 
-ops.NoGradient("an_op")
+ops.NotDifferentiable("an_op")
 
 
 def copy_op(x):
@@ -887,13 +961,13 @@ def copy_op(x):
 
 
 @ops.RegisterGradient("copy")
-def _CopyGrad(op, x_grad):
+def _CopyGrad(op, x_grad):  # pylint: disable=invalid-name
   _ = op
   return x_grad
 
 
 @ops.RegisterGradient("copy_override")
-def _CopyOverrideGrad(op, x_grad):
+def _CopyOverrideGrad(op, x_grad):  # pylint: disable=invalid-name
   _ = op
   return x_grad
 
@@ -921,7 +995,7 @@ class RegistrationTest(test_util.TensorFlowTestCase):
     with g.gradient_override_map({"copy": "unknown_override"}):
       y = copy_op(x)
     with self.assertRaisesRegexp(LookupError, "unknown_override"):
-      fn = ops.get_gradient_function(y.op)
+      ops.get_gradient_function(y.op)
 
 
 class ComparisonTest(test_util.TensorFlowTestCase):
@@ -1213,6 +1287,51 @@ class GraphTest(test_util.TensorFlowTestCase):
     self.assertEqual(a, g.as_graph_element(ConvertibleObj()))
     with self.assertRaises(TypeError):
       g.as_graph_element(NonConvertibleObj())
+
+
+class AttrScopeTest(test_util.TensorFlowTestCase):
+
+  def _get_test_attrs(self):
+    x = control_flow_ops.no_op()
+    try:
+      a = compat.as_text(x.get_attr("_A"))
+    except ValueError:
+      a = None
+    try:
+      b = compat.as_text(x.get_attr("_B"))
+    except ValueError:
+      b = None
+    print(a, b)
+    return (a, b)
+
+  def testNoLabel(self):
+    with self.test_session():
+      self.assertAllEqual((None, None), self._get_test_attrs())
+
+  def testLabelMap(self):
+    with self.test_session() as sess:
+      a1 = self._get_test_attrs()
+      with sess.graph._attr_scope(
+          {"_A": attr_value_pb2.AttrValue(s=compat.as_bytes("foo"))}):
+        a2 = self._get_test_attrs()
+        with sess.graph._attr_scope(
+            {"_A": None,
+             "_B": attr_value_pb2.AttrValue(s=compat.as_bytes("bar"))}):
+          a3 = self._get_test_attrs()
+          with sess.graph._attr_scope(
+              {"_A": attr_value_pb2.AttrValue(s=compat.as_bytes("baz"))}):
+            a4 = self._get_test_attrs()
+          a5 = self._get_test_attrs()
+        a6 = self._get_test_attrs()
+      a7 = self._get_test_attrs()
+
+      self.assertAllEqual((None, None), a1)
+      self.assertAllEqual(("foo", None), a2)
+      self.assertAllEqual((None, "bar"), a3)
+      self.assertAllEqual(("baz", "bar"), a4)
+      self.assertAllEqual((None, "bar"), a5)
+      self.assertAllEqual(("foo", None), a6)
+      self.assertAllEqual((None, None), a7)
 
 ops.RegisterShape("KernelLabel")(common_shapes.scalar_shape)
 

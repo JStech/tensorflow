@@ -30,7 +30,7 @@ from tensorflow.contrib.factorization.python.ops import gmm_ops
 from tensorflow.contrib.learn.python.learn.estimators import estimator
 from tensorflow.contrib.learn.python.learn.estimators._sklearn import TransformerMixin
 from tensorflow.contrib.learn.python.learn.learn_io import data_feeder
-from tensorflow.contrib.learn.python.learn.utils import checkpoints
+from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.control_flow_ops import with_dependencies
 
 
@@ -64,11 +64,11 @@ class GMM(estimator.Estimator, TransformerMixin):
       initial_clusters: specifies how to initialize the clusters for training.
         See gmm_ops.gmm for the possible values.
       covariance_type: one of "full", "diag".
-      batch_size: See TensorFlowEstimator
-      steps: See TensorFlowEstimator
-      continue_training: See TensorFlowEstimator
-      config: See TensorFlowEstimator
-      verbose: See TensorFlowEstimator
+      batch_size: See Estimator
+      steps: See Estimator
+      continue_training: See Estimator
+      config: See Estimator
+      verbose: See Estimator
     """
     super(GMM, self).__init__(
         model_dir=model_dir,
@@ -87,7 +87,7 @@ class GMM(estimator.Estimator, TransformerMixin):
   def fit(self, x, y=None, monitors=None, logdir=None, steps=None):
     """Trains a GMM clustering on x.
 
-    Note: See TensorFlowEstimator for logic for continuous training and graph
+    Note: See Estimator for logic for continuous training and graph
       construction across multiple calls to fit.
 
     Args:
@@ -157,22 +157,27 @@ class GMM(estimator.Estimator, TransformerMixin):
 
   def clusters(self):
     """Returns cluster centers."""
-    clusters = checkpoints.load_variable(self.model_dir,
-                                         gmm_ops.GmmAlgorithm.CLUSTERS_VARIABLE)
+    clusters = tf.contrib.framework.load_variable(
+        self.model_dir, gmm_ops.GmmAlgorithm.CLUSTERS_VARIABLE)
     return np.squeeze(clusters, 1)
 
   def covariances(self):
     """Returns the covariances."""
-    return checkpoints.load_variable(
+    return tf.contrib.framework.load_variable(
         self.model_dir,
         gmm_ops.GmmAlgorithm.CLUSTERS_COVS_VARIABLE)
+
+  def _parse_tensor_or_dict(self, features):
+    if isinstance(features, dict):
+      return array_ops.concat(1, [features[k] for k in sorted(features.keys())])
+    return features
 
   def _get_train_ops(self, features, _):
     (_,
      _,
      losses,
      training_op) = gmm_ops.gmm(
-         features,
+         self._parse_tensor_or_dict(features),
          self._training_initial_clusters,
          self._num_clusters,
          self._random_seed,
@@ -188,7 +193,7 @@ class GMM(estimator.Estimator, TransformerMixin):
      model_predictions,
      _,
      _) = gmm_ops.gmm(
-         features,
+         self._parse_tensor_or_dict(features),
          self._training_initial_clusters,
          self._num_clusters,
          self._random_seed,
@@ -204,7 +209,7 @@ class GMM(estimator.Estimator, TransformerMixin):
      _,
      losses,
      _) = gmm_ops.gmm(
-         features,
+         self._parse_tensor_or_dict(features),
          self._training_initial_clusters,
          self._num_clusters,
          self._random_seed,

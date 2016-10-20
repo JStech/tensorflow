@@ -91,7 +91,7 @@ do_pylint() {
   # Use this list to whitelist pylint errors
   ERROR_WHITELIST="^tensorflow/python/framework/function_test\.py.*\[E1123.*noinline "\
 "^tensorflow/python/platform/default/_gfile\.py.*\[E0301.*non-iterator "\
-"^tensorflow/python/platform/default/_googletest\.py.*\[E0102.*function already defined "\
+"^tensorflow/python/platform/default/_googletest\.py.*\[E0102.*function\salready\sdefined "\
 "^tensorflow/python/platform/gfile\.py.*\[E0301.*non-iterator"
 
   echo "ERROR_WHITELIST=\"${ERROR_WHITELIST}\""
@@ -167,7 +167,7 @@ do_pylint() {
   echo "pylint took $((${PYLINT_END_TIME} - ${PYLINT_START_TIME})) s"
   echo ""
 
-  grep '\[E' ${OUTPUT_FILE} > ${ERRORS_FILE}
+  grep -E '(\[E|\[W0311|\[W0312)' ${OUTPUT_FILE} > ${ERRORS_FILE}
 
   N_ERRORS=0
   while read LINE; do

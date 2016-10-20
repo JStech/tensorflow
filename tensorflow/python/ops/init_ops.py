@@ -13,7 +13,22 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Operations often used for initializing tensors."""
+"""Operations often used for initializing tensors.
+
+All variable initializers returned by functions in this file should have the
+following signature:
+
+def _initializer(shape, dtype=dtypes.float32, partition_info=None):
+  Args:
+    shape: List of `int` representing the shape of the output `Tensor`. Some
+      initializers may also be able to accept a `Tensor`.
+    dtype: (Optional) Type of the output `Tensor`.
+    partition_info: (Optional) variable_scope._PartitionInfo object holding
+      additional information about how the variable is partitioned. May be
+      `None` if the variable is not partitioned.
+  Returns:
+    A `Tensor` of type `dtype` and `shape`.
+"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -46,11 +61,12 @@ def _assert_float_dtype(dtype):
   return dtype
 
 
-# TODO(irving) Move array_ops.zeros_initializer here.
-zeros_initializer = array_ops.zeros_initializer
+def zeros_initializer(shape, dtype=dtypes.float32, partition_info=None):
+  """An adaptor for zeros() to match the Initializer spec."""
+  return array_ops.zeros(shape, dtype)
 
 
-def ones_initializer(shape, dtype=dtypes.float32):
+def ones_initializer(shape, dtype=dtypes.float32, partition_info=None):
   """An adaptor for ones() to match the Initializer spec."""
   return array_ops.ones(shape, dtype)
 
@@ -123,9 +139,9 @@ def constant_initializer(value=0, dtype=dtypes.float32):
     >>>   x = tf.get_variable('x', shape=[2, 3], initializer=init)
 
     ValueError: Too many elements provided. Needed at most 6, but received 8
-    ```
+  ```
   """
-  def _initializer(shape, dtype=dtype):
+  def _initializer(shape, dtype=dtype, partition_info=None):
     return constant_op.constant(value, dtype=dtype, shape=shape)
   return _initializer
 
@@ -147,7 +163,7 @@ def random_uniform_initializer(minval=0, maxval=None, seed=None,
   Returns:
     An initializer that generates tensors with a uniform distribution.
   """
-  def _initializer(shape, dtype=dtype):
+  def _initializer(shape, dtype=dtype, partition_info=None):
     return random_ops.random_uniform(shape, minval, maxval, dtype, seed=seed)
   return _initializer
 
@@ -172,7 +188,8 @@ def random_normal_initializer(mean=0.0, stddev=1.0, seed=None,
   Raises:
     ValueError: if `dtype` is not a floating point type.
   """
-  def _initializer(shape, dtype=_assert_float_dtype(dtype)):
+  def _initializer(shape, dtype=_assert_float_dtype(dtype),
+                   partition_info=None):
     return random_ops.random_normal(shape, mean, stddev, dtype, seed=seed)
   return _initializer
 
@@ -203,13 +220,16 @@ def truncated_normal_initializer(mean=0.0, stddev=1.0, seed=None,
   Raises:
     ValueError: if `dtype` is not a floating point type.
   """
-  def _initializer(shape, dtype=_assert_float_dtype(dtype)):
+  def _initializer(shape, dtype=_assert_float_dtype(dtype),
+                   partition_info=None):
     return random_ops.truncated_normal(shape, mean, stddev, dtype, seed=seed)
+
   return _initializer
 
 
-def uniform_unit_scaling_initializer(factor=1.0, seed=None,
-                                     dtype=dtypes.float32, full_shape=None):
+def uniform_unit_scaling_initializer(factor=1.0,
+                                     seed=None,
+                                     dtype=dtypes.float32):
   """Returns an initializer that generates tensors without scaling variance.
 
   When initializing a deep network, it is in principle advantageous to keep
@@ -228,21 +248,12 @@ def uniform_unit_scaling_initializer(factor=1.0, seed=None,
   and the calculation of constants. In section 2.3 there, the constants were
   numerically computed: for a linear layer it's 1.0, relu: ~1.43, tanh: ~1.15.
 
-  If the shape tuple `full_shape` is provided, the scale will be calculated from
-  this predefined shape.  This is useful when a `Variable` is being partitioned
-  across several shards, and each shard has a smaller shape than the whole.
-  Since the shards are usually concatenated when used, the scale should be
-  based on the shape of the whole.
-
   Args:
     factor: Float.  A multiplicative factor by which the values will be scaled.
     seed: A Python integer. Used to create random seeds. See
       [`set_random_seed`](../../api_docs/python/constant_op.md#set_random_seed)
       for behavior.
     dtype: The data type. Only floating point types are supported.
-    full_shape: Tuple or list of integers.  The shape used for calculating
-      scale normalization (instead of the shape passed at creation time).
-      Useful when creating sharded variables via partitioning.
 
   Returns:
     An initializer that generates tensors with unit variance.
@@ -250,14 +261,20 @@ def uniform_unit_scaling_initializer(factor=1.0, seed=None,
   Raises:
     ValueError: if `dtype` is not a floating point type.
   """
-  def _initializer(shape, dtype=_assert_float_dtype(dtype)):
-    scale_shape = full_shape if full_shape is not None else shape
+  def _initializer(shape, dtype=_assert_float_dtype(dtype),
+                   partition_info=None):
+    scale_shape = shape
+    if partition_info is not None:
+      scale_shape = partition_info.full_shape
+
     input_size = 1.0
     # Estimating input size is not possible to do perfectly, but we try.
     # The estimate, obtained by multiplying all dimensions but the last one,
     # is the right thing for matrix multiply and convolutions (see above).
     for dim in scale_shape[:-1]:
       input_size *= float(dim)
+    # Avoid errors when initializing zero-size tensors.
+    input_size = max(input_size, 1.0)
     max_val = math.sqrt(3 / input_size) * factor
     return random_ops.random_uniform(shape, -max_val, max_val,
                                      dtype, seed=seed)
@@ -319,7 +336,7 @@ class _RandomWalkInitializer(object):
     self._nonlinearity = nonlinearity
     self._seed = seed
 
-  def __call__(self, shape, dtype=dtypes.float32):
+  def __call__(self, shape, dtype=dtypes.float32, partition_info=None):
     """Generate a tensor used to initialize a variable."""
     return random_ops._random_walk(shape, self._nonlinearity, dtype,
                                    seed=self._seed)

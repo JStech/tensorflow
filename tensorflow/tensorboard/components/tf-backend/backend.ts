@@ -24,9 +24,11 @@ module TF.Backend {
     run_metadata: string[];
   }
 
+  export interface LogdirResponse { logdir: string; }
+
   export interface RunsResponse { [runName: string]: RunEnumeration; }
 
-  export type RunToTag = {[run: string]: string[]};
+  export type RunToTag = {[run: string]: string[];};
 
   export interface Datum {
     wall_time: Date;
@@ -90,9 +92,16 @@ module TF.Backend {
      * @param requestManager The RequestManager, overwritable so you may
      * manually clear request queue, etc. Defaults to a new RequestManager.
      */
-    constructor(r: Router, requestManager?: RequestManager) {
-      this.router = r;
+    constructor(router: Router, requestManager?: RequestManager) {
+      this.router = router;
       this.requestManager = requestManager || new RequestManager();
+    }
+
+    /**
+     * Returns a promise for requesting the logdir string.
+     */
+    public logdir(): Promise<LogdirResponse> {
+      return this.requestManager.request(this.router.logdir());
     }
 
     /**
@@ -244,7 +253,7 @@ module TF.Backend {
         height: x.height,
         wall_time: timeToDate(x.wall_time),
         step: x.step,
-        url: this.router.individualImage(x.query),
+        url: this.router.individualImage(x.query, x.wall_time),
       };
     }
 
@@ -260,64 +269,12 @@ module TF.Backend {
 
   /** Given a RunToTag, return sorted array of all runs */
   export function getRuns(r: RunToTag): string[] {
-    return _.keys(r).sort(compareTagNames);
+    return _.keys(r).sort(VZ.Sorting.compareTagNames);
   }
 
   /** Given a RunToTag, return array of all tags (sorted + dedup'd) */
   export function getTags(r: RunToTag): string[] {
-    return _.union.apply(null, _.values(r)).sort(compareTagNames);
-  }
-
-  /** Compares tag names asciinumerically broken into components. */
-  export function compareTagNames(a, b: string): number {
-    let ai = 0;
-    let bi = 0;
-    while (true) {
-      if (ai === a.length) return bi === b.length ? 0 : -1;
-      if (bi === b.length) return 1;
-      if (isDigit(a[ai]) && isDigit(b[bi])) {
-        let ais = ai;
-        let bis = bi;
-        ai = consumeNumber(a, ai + 1);
-        bi = consumeNumber(b, bi + 1);
-        let an = parseFloat(a.slice(ais, ai));
-        let bn = parseFloat(b.slice(bis, bi));
-        if (an < bn) return -1;
-        if (an > bn) return 1;
-        continue;
-      }
-      if (isBreak(a[ai])) {
-        if (!isBreak(b[bi])) return -1;
-      } else if (isBreak(b[bi])) {
-        return 1;
-      } else if (a[ai] < b[bi]) {
-        return -1;
-      } else if (a[ai] > b[bi]) {
-        return 1;
-      }
-      ai++;
-      bi++;
-    }
-  }
-
-  function consumeNumber(s: string, i: number): number {
-    let decimal = false;
-    for (; i < s.length; i++) {
-      if (isDigit(s[i])) continue;
-      if (!decimal && s[i] === '.') {
-        decimal = true;
-        continue;
-      }
-      break;
-    }
-    return i;
-  }
-
-  function isDigit(c: string): boolean { return '0' <= c && c <= '9'; }
-
-  function isBreak(c: string): boolean {
-    // TODO(jart): Remove underscore when people stop using it like a slash.
-    return c === '/' || c === '_' || isDigit(c);
+    return _.union.apply(null, _.values(r)).sort(VZ.Sorting.compareTagNames);
   }
 
   /**
@@ -328,7 +285,7 @@ module TF.Backend {
   export function filterTags(r: RunToTag, runs: string[]): string[] {
     var result = [];
     runs.forEach((x) => result = result.concat(r[x]));
-    return _.uniq(result).sort();
+    return _.uniq(result).sort(VZ.Sorting.compareTagNames);
   }
 
   function timeToDate(x: number): Date { return new Date(x * 1000); };

@@ -49,9 +49,9 @@ using tensorforest::Initialize;
 using tensorforest::IsAllInitialized;
 using tensorforest::FeatureSpec;
 
-using shape_inference::Dimension;
+using shape_inference::DimensionHandle;
 using shape_inference::InferenceContext;
-using shape_inference::Shape;
+using shape_inference::ShapeHandle;
 
 // A data structure to store the results of parallel tree traversal.
 struct InputDataResult {
@@ -174,11 +174,11 @@ REGISTER_OP("CountExtremelyRandomStats")
       bool regression;
       TF_RETURN_IF_ERROR(c->GetAttr("regression", &regression));
 
-      const Dimension* num_points = c->Dim(c->input(0), 0);
+      DimensionHandle num_points = c->Dim(c->input(0), 0);
       if (c->RankKnown(c->input(3)) && c->Rank(c->input(3)) > 0) {
         num_points = c->UnknownDim();
       }
-      const Dimension* num_nodes = c->Dim(c->input(7), 0);
+      DimensionHandle num_nodes = c->Dim(c->input(7), 0);
 
       // Node sums
       c->set_output(0, c->Matrix(num_nodes, num_classes));
@@ -216,7 +216,7 @@ are updated in `pcw_candidate_sums_delta` and `pcw_totals_sums_delta`.
 For `regression` = true, outputs contain the sum of the input_labels
 for the appropriate nodes.  In adddition, the *_squares outputs are filled
 in with the sums of the squares of the input_labels. Since outputs are
-all updated at once, the *_indicies outputs don't specify the output
+all updated at once, the *_indices outputs don't specify the output
 dimension to update, rather the *_delta output contains updates for all the
 outputs.  For example, `pcw_totals_indices` specifies the accumulators to
 update, and `pcw_total_splits_sums_delta` contains the complete output
@@ -527,9 +527,9 @@ class CountExtremelyRandomStats : public OpKernel {
     auto out_leaves = output_leaves->unaligned_flat<int32>();
 
     // <accumulator, class> -> count delta
-    PairMapType<int32> total_delta;
+    PairMapType<float> total_delta;
     // <accumulator, split, class> -> count delta
-    TupleMapType<int32> split_delta;
+    TupleMapType<float> split_delta;
 
     for (int32 i = 0; i < num_data; ++i) {
       out_leaves(i) = results[i].node_indices.back();

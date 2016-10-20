@@ -139,6 +139,23 @@ class TensorUtilTest(tf.test.TestCase):
                                     [10.0, 10.0, 10.0, 10.0],
                                     [10.0, 10.0, 10.0, 10.0]], dtype=nptype), a)
 
+  def testHalf(self):
+    t = tensor_util.make_tensor_proto(np.array([10.0, 20.0], dtype=np.float16))
+    self.assertProtoEquals("""
+      dtype: DT_HALF
+      tensor_shape {
+        dim {
+          size: 2
+        }
+      }
+      half_val: 18688
+      half_val: 19712
+      """, t)
+
+    a = tensor_util.MakeNdarray(t)
+    self.assertEquals(np.float16, a.dtype)
+    self.assertAllClose(np.array([10.0, 20.0], dtype=np.float16), a)
+
   def testInt(self):
     t = tensor_util.make_tensor_proto(10)
     self.assertProtoEquals("""
@@ -358,6 +375,34 @@ class TensorUtilTest(tf.test.TestCase):
     a = tensor_util.MakeNdarray(t)
     self.assertEquals(np.object, a.dtype)
     self.assertAllEqual(np.array([[b"a", b"ab"], [b"abc", b"abcd"]]), a)
+
+  def testStringTuple(self):
+    t = tensor_util.make_tensor_proto((b"a", b"ab", b"abc", b"abcd"))
+    self.assertProtoEquals("""
+      dtype: DT_STRING
+      tensor_shape { dim { size: 4 } }
+      string_val: "a"
+      string_val: "ab"
+      string_val: "abc"
+      string_val: "abcd"
+      """, t)
+    a = tensor_util.MakeNdarray(t)
+    self.assertEquals(np.object, a.dtype)
+    self.assertAllEqual(np.array((b"a", b"ab", b"abc", b"abcd")), a)
+
+  def testStringNestedTuple(self):
+    t = tensor_util.make_tensor_proto(((b"a", b"ab"), (b"abc", b"abcd")))
+    self.assertProtoEquals("""
+      dtype: DT_STRING
+      tensor_shape { dim { size: 2 } dim { size: 2 } }
+      string_val: "a"
+      string_val: "ab"
+      string_val: "abc"
+      string_val: "abcd"
+      """, t)
+    a = tensor_util.MakeNdarray(t)
+    self.assertEquals(np.object, a.dtype)
+    self.assertAllEqual(np.array(((b"a", b"ab"), (b"abc", b"abcd"))), a)
 
   def testComplex64(self):
     t = tensor_util.make_tensor_proto((1+2j), dtype=tf.complex64)
