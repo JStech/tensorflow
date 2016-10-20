@@ -32,8 +32,7 @@ def _AddEvents(path):
   if not gfile.IsDirectory(path):
     gfile.MakeDirs(path)
   fpath = os.path.join(path, 'hypothetical.tfevents.out')
-  with gfile.GFile(fpath, 'w') as f:
-    f.write('')
+  with gfile.GFile(fpath, 'w'):
     return fpath
 
 

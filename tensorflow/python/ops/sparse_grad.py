@@ -25,11 +25,9 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import sparse_ops
 
 
-# TODO(b/31222613): This op may be differentiable, and there may be
-# latent bugs here.
-ops.NotDifferentiable("SparseAddGrad")
-ops.NotDifferentiable("SparseConcat")
-ops.NotDifferentiable("SparseToDense")
+ops.NoGradient("SparseAddGrad")
+ops.NoGradient("SparseConcat")
+ops.NoGradient("SparseToDense")
 
 
 @ops.RegisterGradient("SparseReorder")

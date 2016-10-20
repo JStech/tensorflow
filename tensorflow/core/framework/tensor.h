@@ -133,6 +133,10 @@ class Tensor {
   // True iff the two tensors use the same underlying refcounted storage
   bool SharesBufferWith(const Tensor& b) const;
 
+  // The BufferHash of two tensors are equal when they share the same
+  // underlying refcounted storage
+  size_t BufferHash() const;
+
   /// \brief If necessary, has this Tensor been initialized?
   ///
   /// Zero-element Tensors are always considered initialized, even if they
@@ -144,11 +148,11 @@ class Tensor {
 
   /// Returns true iff this tensor is aligned.
   bool IsAligned() const {
-#if EIGEN_MAX_ALIGN_BYTES == 0
-    return true;
-#else
+#if EIGEN_ALIGN == 1
     void* ptr = base<void>();
     return reinterpret_cast<intptr_t>(ptr) % EIGEN_MAX_ALIGN_BYTES == 0;
+#else
+    return true;
 #endif
   }
 
@@ -466,8 +470,6 @@ class Tensor {
 
 // Implementation details
 
-// START_SKIP_DOXYGEN
-
 // Interface to access the raw ref-counted data buffer.
 class TensorBuffer : public core::RefCounted {
  public:
@@ -660,8 +662,6 @@ inline Tensor& Tensor::operator=(Tensor&& other) {
   }
   return *this;
 }
-
-// END_SKIP_DOXYGEN
 
 }  // namespace tensorflow
 

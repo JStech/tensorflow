@@ -32,7 +32,6 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.ops import io_ops
 from tensorflow.python.ops import logging_ops
@@ -180,9 +179,8 @@ def string_input_producer(string_tensor, num_epochs=None, shuffle=True,
   with ops.name_scope(name, "input_producer", [string_tensor]) as name:
     string_tensor = ops.convert_to_tensor(string_tensor, dtype=dtypes.string)
     with ops.control_dependencies([
-        control_flow_ops.Assert(
-            math_ops.greater(array_ops.size(string_tensor), 0),
-            [not_null_err])]):
+        logging_ops.Assert(math_ops.greater(array_ops.size(string_tensor), 0),
+                           [not_null_err])]):
       string_tensor = array_ops.identity(string_tensor)
     return input_producer(
         input_tensor=string_tensor,
@@ -521,7 +519,7 @@ def batch(tensors, batch_size, num_threads=1, capacity=32,
 
   If `enqueue_many` is `True`, `tensors` is assumed to represent a batch of
   examples, where the first dimension is indexed by example, and all members of
-  `tensors` should have the same size in the first dimension.  If an input
+  `tensor_list` should have the same size in the first dimension.  If an input
   tensor has shape `[*, x, y, z]`, the output will have shape `[batch_size, x,
   y, z]`.  The `capacity` argument controls the how long the prefetching is
   allowed to grow the queues.
@@ -555,11 +553,11 @@ def batch(tensors, batch_size, num_threads=1, capacity=32,
   Args:
     tensors: The list or dictionary of tensors to enqueue.
     batch_size: The new batch size pulled from the queue.
-    num_threads: The number of threads enqueuing `tensors`.
+    num_threads: The number of threads enqueuing `tensor_list`.
     capacity: An integer. The maximum number of elements in the queue.
-    enqueue_many: Whether each tensor in `tensors` is a single example.
+    enqueue_many: Whether each tensor in `tensor_list` is a single example.
     shapes: (Optional) The shapes for each example.  Defaults to the
-      inferred shapes for `tensors`.
+      inferred shapes for `tensor_list`.
     dynamic_pad: Boolean.  Allow variable dimensions in input shapes.
       The given dimensions are padded upon dequeue so that tensors within a
       batch have the same shapes.

@@ -25,6 +25,7 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+from tensorflow.contrib.factorization.python.ops import factorization_ops
 
 INPUT_MATRIX = np.array(
     [[0.1, 0.0, 0.2, 0.0, 0.4, 0.5, 0.0],
@@ -115,7 +116,7 @@ class WalsModelTest(tf.test.TestCase):
   def _run_test_process_input(self, use_factors_weights_cache):
     with self.test_session():
       sp_feeder = tf.sparse_placeholder(tf.float32)
-      wals_model = tf.contrib.factorization.WALSModel(
+      wals_model = factorization_ops.WALSModel(
           5, 7, 3,
           num_row_shards=2,
           num_col_shards=3,
@@ -183,7 +184,7 @@ class WalsModelTest(tf.test.TestCase):
   def _run_test_process_input_transposed(self, use_factors_weights_cache):
     with self.test_session():
       sp_feeder = tf.sparse_placeholder(tf.float32)
-      wals_model = tf.contrib.factorization.WALSModel(
+      wals_model = factorization_ops.WALSModel(
           5, 7, 3,
           num_row_shards=2,
           num_col_shards=3,
@@ -267,7 +268,7 @@ class WalsModelTest(tf.test.TestCase):
   def _run_test_als(self, use_factors_weights_cache):
     with self.test_session():
       col_init = np.random.rand(7, 3)
-      als_model = tf.contrib.factorization.WALSModel(
+      als_model = factorization_ops.WALSModel(
           5, 7, 3,
           col_init=col_init,
           row_weights=None,
@@ -282,11 +283,11 @@ class WalsModelTest(tf.test.TestCase):
       process_input_op.run()
       row_factors1 = [x.eval() for x in als_model.row_factors]
 
-      wals_model = tf.contrib.factorization.WALSModel(
+      wals_model = factorization_ops.WALSModel(
           5, 7, 3,
           col_init=col_init,
-          row_weights=0,
-          col_weights=0,
+          row_weights=[0] * 5,
+          col_weights=[0] * 7,
           use_factors_weights_cache=use_factors_weights_cache)
       wals_model.initialize_op.run()
       wals_model.worker_init.run()
@@ -324,7 +325,7 @@ class WalsModelTest(tf.test.TestCase):
   def _run_test_als_transposed(self, use_factors_weights_cache):
     with self.test_session():
       col_init = np.random.rand(7, 3)
-      als_model = tf.contrib.factorization.WALSModel(
+      als_model = factorization_ops.WALSModel(
           5, 7, 3,
           col_init=col_init,
           row_weights=None,
@@ -334,7 +335,7 @@ class WalsModelTest(tf.test.TestCase):
       als_model.initialize_op.run()
       als_model.worker_init.run()
 
-      wals_model = tf.contrib.factorization.WALSModel(
+      wals_model = factorization_ops.WALSModel(
           5, 7, 3,
           col_init=col_init,
           row_weights=[0] * 5,
@@ -402,7 +403,7 @@ class WalsModelTest(tf.test.TestCase):
       indices = [[i, j] for i in xrange(rows) for j in xrange(cols)]
       values = data.reshape(-1)
       inp = tf.SparseTensor(indices, values, [rows, cols])
-      model = tf.contrib.factorization.WALSModel(
+      model = factorization_ops.WALSModel(
           rows, cols, dims,
           regularization=1e-5,
           row_weights=None,
@@ -428,10 +429,10 @@ class WalsModelTest(tf.test.TestCase):
       indices = [[i, j] for i in xrange(rows) for j in xrange(cols)]
       values = data.reshape(-1)
       inp = tf.SparseTensor(indices, values, [rows, cols])
-      model = tf.contrib.factorization.WALSModel(
+      model = factorization_ops.WALSModel(
           rows, cols, dims,
           regularization=1e-5,
-          row_weights=0,
+          row_weights=[0] * rows,
           col_weights=[0] * cols,
           use_factors_weights_cache=use_factors_weights_cache)
       self.simple_train(model, inp, 25)
@@ -460,7 +461,7 @@ class WalsModelTest(tf.test.TestCase):
                       [[i, j] for i in xrange(rows) for j in xrange(cols)])))
       values = data[indices[:, 0], indices[:, 1]]
       inp = tf.SparseTensor(indices, values, [rows, cols])
-      model = tf.contrib.factorization.WALSModel(
+      model = factorization_ops.WALSModel(
           rows, cols, dims,
           unobserved_weight=0.01,
           regularization=0.001,
@@ -500,7 +501,7 @@ class WalsModelTest(tf.test.TestCase):
   def test_als_transposed_with_cache(self):
     self._run_test_als_transposed(True)
 
-  def test_als_transposed_without_cache(self):
+  def test_als_without_cache(self):
     self._run_test_als_transposed(False)
 
   def test_train_full_low_rank_wals_with_cache(self):

@@ -28,10 +28,10 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <class Scalar>
-class MatrixSolveOp : public LinearAlgebraOp<Scalar> {
+template <class Scalar, bool SupportsBatchOperation>
+class MatrixSolveOp : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
  public:
-  typedef LinearAlgebraOp<Scalar> Base;
+  typedef LinearAlgebraOp<Scalar, SupportsBatchOperation> Base;
 
   explicit MatrixSolveOp(OpKernelConstruction* context) : Base(context) {
     OP_REQUIRES_OK(context, context->GetAttr("adjoint", &adjoint_));
@@ -87,10 +87,9 @@ class MatrixSolveOp : public LinearAlgebraOp<Scalar> {
     // a result of basic user mistakes such providing integer valued
     // matrices that are exactly singular, or due to underflow if this
     // code is run with denormals being flushed to zero.
-    using RealScalar = typename Base::RealScalar;
-    const RealScalar min_abs_pivot =
+    const Scalar min_abs_pivot =
         lu_decomposition.matrixLU().diagonal().cwiseAbs().minCoeff();
-    OP_REQUIRES(context, min_abs_pivot > RealScalar(0),
+    OP_REQUIRES(context, min_abs_pivot > Scalar(0),
                 errors::InvalidArgument("Input matrix is not invertible."));
 
     // TODO(rmlarsen): Add check based on condition number estimation.
@@ -106,12 +105,9 @@ class MatrixSolveOp : public LinearAlgebraOp<Scalar> {
   TF_DISALLOW_COPY_AND_ASSIGN(MatrixSolveOp);
 };
 
-REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<float>), float);
-REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<double>), double);
-REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<complex64>), complex64);
-REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<complex128>), complex128);
-REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<float>), float);
-REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<double>), double);
-REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<complex64>), complex64);
-REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<complex128>), complex128);
+REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<float, false>), float);
+REGISTER_LINALG_OP("MatrixSolve", (MatrixSolveOp<double, false>), double);
+REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<float, true>), float);
+REGISTER_LINALG_OP("BatchMatrixSolve", (MatrixSolveOp<double, true>), double);
+
 }  // namespace tensorflow

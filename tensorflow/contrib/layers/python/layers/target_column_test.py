@@ -27,29 +27,23 @@ class RegressionTargetColumnTest(tf.test.TestCase):
   def testRegression(self):
     target_column = tf.contrib.layers.regression_target()
     with tf.Graph().as_default(), tf.Session() as sess:
-      prediction = tf.constant([[1.], [1.], [3.]])
+      logits = tf.constant([[1.], [1.], [3.]])
       targets = tf.constant([[0.], [1.], [1.]])
-      self.assertAlmostEqual(
-          5. / 3, sess.run(target_column.loss(prediction, targets, {})))
+      self.assertAlmostEqual(5. / 3,
+                             sess.run(target_column.loss(logits, targets, {})))
 
   def testRegressionWithWeights(self):
     target_column = tf.contrib.layers.regression_target(
         weight_column_name="label_weight")
     with tf.Graph().as_default(), tf.Session() as sess:
-      features = {"label_weight": tf.constant([[2.], [5.], [0.]])}
-      prediction = tf.constant([[1.], [1.], [3.]])
+      features = {"label_weight": tf.constant([[1.], [0.], [0.]])}
+      logits = tf.constant([[1.], [1.], [3.]])
       targets = tf.constant([[0.], [1.], [1.]])
       self.assertAlmostEqual(
-          2. / 7,
-          sess.run(target_column.loss(prediction, targets, features)),
-          places=3)
-      self.assertAlmostEqual(
-          2. / 3,
-          sess.run(target_column.training_loss(prediction, targets, features)),
-          places=3)
+          1., sess.run(target_column.loss(logits, targets, features)))
 
 
-class MultiClassTargetColumnTest(tf.test.TestCase):
+class MulltiClassTargetColumnTest(tf.test.TestCase):
 
   def testBinaryClassification(self):
     target_column = tf.contrib.layers.multi_class_target(n_classes=2)
@@ -132,9 +126,9 @@ class MultiClassTargetColumnTest(tf.test.TestCase):
 
   def testBinarySVMDefaultWeights(self):
     target_column = tf.contrib.layers.binary_svm_target()
-    predictions = tf.constant([[-0.5], [1.2]])
+    logits = tf.constant([[-0.5], [1.2]])
     targets = tf.constant([0, 1])
-    loss = target_column.loss(predictions, targets, {})
+    loss = target_column.loss(logits, targets, {})
     # Prediction for first example is in the right side of the hyperplane (i.e.,
     # < 0) but it is within the [-1,1] margin. There is a 0.5 loss incurred by
     # this example. The 2nd prediction is outside the margin so it incurs no
@@ -145,17 +139,15 @@ class MultiClassTargetColumnTest(tf.test.TestCase):
   def testBinarySVMWithWeights(self):
     target_column = tf.contrib.layers.binary_svm_target(
         weight_column_name="weights")
-    predictions = tf.constant([[-0.7], [0.2]])
+    logits = tf.constant([[-0.7], [0.2]])
     targets = tf.constant([0, 1])
     features = {"weights": tf.constant([2.0, 10.0])}
-    loss = target_column.loss(predictions, targets, features)
-    training_loss = target_column.training_loss(predictions, targets, features)
+    loss = target_column.loss(logits, targets, features)
     # Prediction for both examples are in the right side of the hyperplane but
     # within the margin. The (weighted) loss incurred is 2*0.3=0.6 and 10*0.8=8
     # respectively. The overall (normalized) loss is therefore 8.6/12.
     with tf.Session() as sess:
-      self.assertAlmostEqual(8.6 / 12, sess.run(loss), places=3)
-      self.assertAlmostEqual(8.6 / 2, sess.run(training_loss), places=3)
+      self.assertAlmostEqual(8.6 / 12, sess.run(loss))
 
 
 if __name__ == "__main__":

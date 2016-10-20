@@ -122,13 +122,6 @@ class TransposeTest(tf.test.TestCase):
     self._compareCpu(np.arange(0, 8).reshape([2, 4]).astype(np.float32),
                      np.array([1, 0]).astype(np.int32))
 
-  def testHalf(self):
-    self._compare(np.arange(0, 21).reshape([3, 7]).astype(np.float16))
-    self._compare(
-        np.arange(0, 210).reshape([2, 3, 5, 7]).astype(np.float16))
-    self._compare(
-        np.arange(0, 16).reshape([1, 2, 1, 2, 1, 2, 1, 2]).astype(np.float16))
-
   def testFloat(self):
     self._compare_cpu_gpu(np.arange(0, 21).reshape([3, 7]).astype(np.float32))
     self._compare_cpu_gpu(
@@ -226,7 +219,7 @@ class TransposeTest(tf.test.TestCase):
     self._testError(np.arange(0., 2 ** 11).reshape([2] * 11),
                     np.arange(11),
                     "not implemented")
-    with self.assertRaises(ValueError):
+    with self.assertRaises(IndexError):
       tf.transpose(np.arange(0., 30).reshape([2, 3, 5]), [0, 1, 3])
     self._testError(np.arange(0., 30).reshape([2, 3, 5]),
                     [0, 1, 1],

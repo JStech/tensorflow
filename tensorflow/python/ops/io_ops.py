@@ -80,13 +80,6 @@ Queues](../../how_tos/threading_and_queues/index.md).
 @@FIFOQueue
 @@PaddingFIFOQueue
 @@RandomShuffleQueue
-@@PriorityQueue
-
-## Conditional Accumulators
-
-@@ConditionalAccumulatorBase
-@@ConditionalAccumulator
-@@SparseConditionalAccumulator
 
 ## Dealing with the filesystem
 
@@ -144,6 +137,7 @@ from __future__ import print_function
 from tensorflow.python.framework import common_shapes
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import tensor_shape
 from tensorflow.python.lib.io import python_io
 from tensorflow.python.ops import gen_io_ops
 # go/tf-wildcard-import
@@ -210,16 +204,80 @@ def _restore_slice(file_pattern, tensor_name, shape_and_slice, tensor_type,
       preferred_shard, name=name)
 
 
-ops.RegisterShape("Restore")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("RestoreSlice")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("Save")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("SaveSlices")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ShardedFilename")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ShardedFilespec")(common_shapes.call_cpp_shape_fn)
+@ops.RegisterShape("Restore")
+def _RestoreShape(op):
+  """Shape function for Restore op."""
+  # Validate input shapes.
+  unused_file_pattern = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_tensor_name = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.unknown_shape()]
 
-ops.RegisterShape("SaveV2")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("RestoreV2")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("MergeV2Checkpoints")(common_shapes.call_cpp_shape_fn)
+
+@ops.RegisterShape("RestoreSlice")
+def _RestoreSliceShape(op):
+  """Shape function for RestoreSlice op."""
+  # Validate input shapes.
+  unused_file_pattern = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_tensor_name = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_shape_and_slice_shape = op.inputs[2].get_shape().merge_with(
+      tensor_shape.scalar())
+  # TODO(mrry): Attempt to parse the shape_and_slice value and use it
+  # to form the shape of the output.
+  return [tensor_shape.unknown_shape()]
+
+
+@ops.RegisterShape("Save")
+def _SaveShape(op):
+  """Shape function for Save op."""
+  # Validate input shapes.
+  unused_filename = op.inputs[0].get_shape().merge_with(tensor_shape.scalar())
+  data_count = len(op.inputs) - 2
+  unused_tensor_names_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.vector(data_count))
+  return []
+
+
+@ops.RegisterShape("SaveSlices")
+def _SaveSlicesShape(op):
+  """Shape function for SaveSlices op."""
+  # Validate input shapes.
+  unused_filename = op.inputs[0].get_shape().merge_with(tensor_shape.scalar())
+  data_count = len(op.inputs) - 3
+  unused_tensor_names_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.vector(data_count))
+  unused_shapes_and_slices_shape = op.inputs[2].get_shape().merge_with(
+      tensor_shape.vector(data_count))
+  # TODO(mrry): Attempt to parse the shapes_and_slices values and use
+  # them to constrain the shape of the remaining inputs.
+  return []
+
+
+@ops.RegisterShape("ShardedFilename")
+def _ShardedFilenameShape(op):
+  """Shape function for ShardedFilename op."""
+  # Validate input shapes.
+  unused_basename_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_shard_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_num_shards_shape = op.inputs[2].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.scalar()]
+
+
+@ops.RegisterShape("ShardedFilespec")
+def _ShardedFilespecShape(op):
+  """Shape function for ShardedFilespec op."""
+  # Validate input shapes.
+  unused_basename_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_num_shards_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.scalar()]
 
 
 class ReaderBase(object):
@@ -379,13 +437,13 @@ class ReaderBase(object):
     return gen_io_ops._reader_reset(self._reader_ref, name=name)
 
 
-ops.NotDifferentiable("ReaderRead")
-ops.NotDifferentiable("ReaderReadUpTo")
-ops.NotDifferentiable("ReaderNumRecordsProduced")
-ops.NotDifferentiable("ReaderNumWorkUnitsCompleted")
-ops.NotDifferentiable("ReaderSerializeState")
-ops.NotDifferentiable("ReaderRestoreState")
-ops.NotDifferentiable("ReaderReset")
+ops.NoGradient("ReaderRead")
+ops.NoGradient("ReaderReadUpTo")
+ops.NoGradient("ReaderNumRecordsProduced")
+ops.NoGradient("ReaderNumWorkUnitsCompleted")
+ops.NoGradient("ReaderSerializeState")
+ops.NoGradient("ReaderRestoreState")
+ops.NoGradient("ReaderReset")
 
 
 class WholeFileReader(ReaderBase):
@@ -407,7 +465,7 @@ class WholeFileReader(ReaderBase):
     super(WholeFileReader, self).__init__(rr, supports_serialize=True)
 
 
-ops.NotDifferentiable("WholeFileReader")
+ops.NoGradient("WholeFileReader")
 
 
 class TextLineReader(ReaderBase):
@@ -431,7 +489,7 @@ class TextLineReader(ReaderBase):
     super(TextLineReader, self).__init__(rr)
 
 
-ops.NotDifferentiable("TextLineReader")
+ops.NoGradient("TextLineReader")
 
 
 class FixedLengthRecordReader(ReaderBase):
@@ -457,7 +515,7 @@ class FixedLengthRecordReader(ReaderBase):
     super(FixedLengthRecordReader, self).__init__(rr)
 
 
-ops.NotDifferentiable("FixedLengthRecordReader")
+ops.NoGradient("FixedLengthRecordReader")
 
 
 class TFRecordReader(ReaderBase):
@@ -474,15 +532,17 @@ class TFRecordReader(ReaderBase):
       name: A name for the operation (optional).
       options: A TFRecordOptions object (optional).
     """
-    compression_type = python_io.TFRecordOptions.get_compression_type_string(
-        options)
+    compression_type_string = ""
+    if (options and
+        options.compression_type == python_io.TFRecordCompressionType.ZLIB):
+      compression_type_string = "ZLIB"
 
-    rr = gen_io_ops._tf_record_reader(
-        name=name, compression_type=compression_type)
+    rr = gen_io_ops._tf_record_reader(name=name,
+                                      compression_type=compression_type_string)
     super(TFRecordReader, self).__init__(rr)
 
 
-ops.NotDifferentiable("TFRecordReader")
+ops.NoGradient("TFRecordReader")
 
 
 class IdentityReader(ReaderBase):
@@ -504,21 +564,70 @@ class IdentityReader(ReaderBase):
     super(IdentityReader, self).__init__(rr, supports_serialize=True)
 
 
-ops.NotDifferentiable("IdentityReader")
+ops.NoGradient("IdentityReader")
 
 
-ops.RegisterShape("FixedLengthRecordReader")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("IdentityReader")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("TextLineReader")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("WholeFileReader")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("TFRecordReader")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderNumRecordsProduced")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderNumWorkUnitsCompleted")(
-    common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderSerializeState")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderRead")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderReadUpTo")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderReset")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReaderRestoreState")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("ReadFile")(common_shapes.call_cpp_shape_fn)
-ops.RegisterShape("MatchingFiles")(common_shapes.call_cpp_shape_fn)
+ops.RegisterShape("FixedLengthRecordReader")(common_shapes.scalar_shape)
+ops.RegisterShape("IdentityReader")(common_shapes.scalar_shape)
+ops.RegisterShape("TextLineReader")(common_shapes.scalar_shape)
+ops.RegisterShape("WholeFileReader")(common_shapes.scalar_shape)
+ops.RegisterShape("TFRecordReader")(common_shapes.scalar_shape)
+
+
+@ops.RegisterShape("ReaderNumRecordsProduced")
+@ops.RegisterShape("ReaderNumWorkUnitsCompleted")
+@ops.RegisterShape("ReaderSerializeState")
+def _ReaderScalarShape(op):
+  """Shape function for ops that transform a reader to a scalar."""
+  unused_handle_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.scalar()]
+
+
+@ops.RegisterShape("ReaderRead")
+def _ReaderReadShape(op):
+  """Shape function for the ReaderBase.Read op."""
+  unused_handle_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_queue_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.scalar(), tensor_shape.scalar()]
+
+
+@ops.RegisterShape("ReaderReadUpTo")
+def _ReaderReadUpToShape(_):
+  """Shape function for the ReaderBase.ReadUpTo op."""
+  return [tensor_shape.unknown_shape(ndims=1),
+          tensor_shape.unknown_shape(ndims=1)]
+
+
+@ops.RegisterShape("ReaderReset")
+def _ReaderResetShape(op):
+  """Shape function for the ReaderBase.Reset op."""
+  unused_handle_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  return []
+
+
+@ops.RegisterShape("ReaderRestoreState")
+def _ReaderRestoreStateShape(op):
+  """Shape function for the ReaderBase.Restore op."""
+  unused_handle_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  unused_state_shape = op.inputs[1].get_shape().merge_with(
+      tensor_shape.scalar())
+  return []
+
+
+@ops.RegisterShape("ReadFile")
+def _ReadFileShape(op):
+  """Shape function for the ReadFile op."""
+  return [op.inputs[0].get_shape().merge_with(tensor_shape.scalar())]
+
+
+@ops.RegisterShape("MatchingFiles")
+def _MatchingFilesShape(op):
+  """Shape function for the MatchingFiles op."""
+  unused_patern_shape = op.inputs[0].get_shape().merge_with(
+      tensor_shape.scalar())
+  return [tensor_shape.unknown_shape(ndims=1)]

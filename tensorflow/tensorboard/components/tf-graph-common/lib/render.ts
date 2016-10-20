@@ -79,16 +79,15 @@ const PARAMS = {
    */
   enableExtraction: true,
   /**
-   * The minimum number of nodes for a graph to have in order for high in and
-   * out degree nodes to be extracted in auxiliary. The aim here is to prevent
-   * nodes from being extracted from small graphs.
+   * Maximum in-degree that a node can have without being considered as
+   * high in-degree node.
    */
-  minNodeCountForExtraction: 15,
+  maxInDegree: 4,
   /**
-   * The minimum in or out degree a node must have in order to be possibly
-   * extracted.
+   * Maximum out-degree that a node can have without being considered as
+   * high out-degree node.
    */
-  minDegreeForExtraction: 5,
+  maxOutDegree: 4,
   /**
    * Maximum number of control edges a node can have before they aren't
    * displayed.
@@ -106,7 +105,7 @@ const PARAMS = {
    * Types patterns for predefined in-extract nodes, which are
    * source-like nodes that will be extracted from the main graph.
    */
-  inExtractTypes: [],
+  inExtractTypes: ['Variable'],
 
   /**
    * When removing edges from a high degree node, remove all of its edges if
@@ -478,14 +477,10 @@ export class RenderGraphInfo {
           [renderNodeInfo.inAnnotations, childRenderInfo.inAnnotations] :
           [renderNodeInfo.outAnnotations, childRenderInfo.outAnnotations];
 
-      // Do not render a bridge path to a node if the node is extracted into the
-      // auxiliary graph for having a high degree. If we are not sure now,
-      // default to not rendering a bridge path.
-      let isOtherHighDegree = true;
-      if (otherRenderInfo) {
-        isOtherHighDegree = inbound ? otherRenderInfo.isOutExtract :
-                                      otherRenderInfo.isInExtract;
-      }
+      let isOtherHighDegree =
+        inbound ?
+          otherCounts.out[otherName] > PARAMS.maxOutDegree :
+          otherCounts.in[otherName] > PARAMS.maxInDegree;
 
       // The adjoining render metaedge info from the parent's coreGraph, if any.
       // It will either be a Metaedge involving this node directly, if it
@@ -802,11 +797,6 @@ export class Annotation {
   width: number;
   height: number;
   /**
-   * The names of nodes on either side of this edge.
-   */
-  v: string;
-  w: string;
-  /**
    * A flag whether it is an in-annotation (if true) or
    * out-annotation  (if false).
    */
@@ -846,12 +836,6 @@ export class Annotation {
     this.dy = 0;
     this.width = 0;
     this.height = 0;
-    // Properties needed for generating an ID for the edge's path element if
-    // this annotation is associated with a metaedge.
-    if (renderMetaedgeInfo && renderMetaedgeInfo.metaedge) {
-      this.v = renderMetaedgeInfo.metaedge.v;
-      this.w = renderMetaedgeInfo.metaedge.w;
-    }
 
     this.isIn = isIn;
     this.points = [];
@@ -1356,8 +1340,9 @@ function extractPredefinedSink(renderNode: RenderGroupNodeInfo) {
 }
 
 /** Remove edges from pre-defined in-extract patterns */
-function extractPredefinedSource(renderNode) {
+function extractPredefinedSource(renderNode: RenderGroupNodeInfo) {
   let graph = renderNode.coreGraph;
+
   _.each(graph.nodes(), n => {
     let renderInfo = graph.node(n);
     if (renderInfo.node.include !== InclusionType.UNSPECIFIED) {
@@ -1369,100 +1354,64 @@ function extractPredefinedSource(renderNode) {
   });
 }
 
-/** Extract nodes deemed to have either high in-degree or high out-degree. */
-function extractHighInOrOutDegree(renderNode: RenderGroupNodeInfo) {
+/** Extract from nodes with in-degree > maxInDegree */
+function extractHighInDegree(renderNode: RenderGroupNodeInfo) {
   let graph = renderNode.coreGraph;
+  let maxInDegree = PARAMS.maxInDegree;
 
-  // Create mappings from node to in and out degrees. Count the number of valid
-  // nodes along the way.
-  let nodeToInDegree = {};
-  let nodeToOutDegree = {};
-  let validNodeCount = 0;
-  _.each(graph.nodes(), currentNode => {
-    if (graph.node(currentNode).node.include !== InclusionType.UNSPECIFIED) {
-      // This node is not included in the first place.
-      return;
+  // detect first so degrees don't get affected by other removal
+  let highInDegreeNames = _.filter(graph.nodes(), n => {
+    if (graph.node(n).node.include !== InclusionType.UNSPECIFIED) {
+      return false;
     }
-
-    // Count the in and out degrees based on only regular edges, unless there
-    // are no regular edges, in which case use the number of control edges.
-    // This is done so that control edges don't affect if nodes are extracted
+    // Count the in-degree based on only regular edges, unless there are
+    // no regular edges, in which case use the number of control edges.
+    // This is done so that control edges don't effect if nodes are extracted
     // from the core graph, unless the node is only used for control.
-    let inDegree =
-        _.reduce(graph.predecessors(currentNode), (inDegree, pred) => {
-          let metaedge = graph.edge(pred, currentNode).metaedge;
-          return inDegree + (metaedge.numRegularEdges ? 1 : 0);
-        }, 0);
-    if (inDegree === 0 && graph.predecessors(currentNode).length > 0) {
-      inDegree = graph.predecessors(currentNode).length;
+    let numEdgesToCount = _.reduce(graph.predecessors(n),
+        (numEdgesToCount, pred) => {
+      let metaedge = graph.edge(pred, n).metaedge;
+      return numEdgesToCount + (metaedge.numRegularEdges ? 1 : 0);
+    }, 0);
+    if (numEdgesToCount === 0 && graph.predecessors(n).length > 0) {
+      numEdgesToCount = graph.predecessors(n).length;
     }
-
-    let outDegree =
-        _.reduce(graph.successors(currentNode), (outDegree, succ) => {
-          let metaedge = graph.edge(currentNode, succ).metaedge;
-          return outDegree + (metaedge.numRegularEdges ? 1 : 0);
-        }, 0);
-    if (outDegree === 0 && graph.successors(currentNode).length > 0) {
-      outDegree = graph.successors(currentNode).length;
-    }
-
-    // Store the in and out degrees of this node to avoid recomputing.
-    nodeToInDegree[currentNode] = inDegree;
-    nodeToOutDegree[currentNode] = outDegree;
-    validNodeCount++;
+    return numEdgesToCount > maxInDegree;
   });
 
-  if (validNodeCount < PARAMS.minNodeCountForExtraction) {
-    // This graph has few nodes. Do not extract any nodes.
-    return;
-  }
-
-  // We only extract if the node has a min in or out degree greater than this.
-  let minUpperBound = PARAMS.minDegreeForExtraction - 1;
-
-  // Mark for extraction nodes with in-degree > Q3 + (Q3 - Q1).
-  let q3Index = Math.round(validNodeCount * 0.75);
-  let q1Index = Math.round(validNodeCount * 0.25);
-  let sortedByInDegree = Object.keys(nodeToInDegree).sort((node0, node1) => {
-    return nodeToInDegree[node0] - nodeToInDegree[node1];
+  _.each(highInDegreeNames, n => {
+    makeOutExtract(renderNode, n);
   });
-  let inDegreeQ3 = nodeToInDegree[sortedByInDegree[q3Index]];
-  let inDegreeQ1 = nodeToInDegree[sortedByInDegree[q1Index]];
-  let inDegreeUpperBound = inDegreeQ3 + inDegreeQ3 - inDegreeQ1;
-  // Only extract if the upper bound is high enough.
-  inDegreeUpperBound = Math.max(inDegreeUpperBound, minUpperBound);
-  for (let i = validNodeCount - 1;
-       nodeToInDegree[sortedByInDegree[i]] > inDegreeUpperBound; i--) {
-    // Extract a high in-degree node.
-    makeInExtract(renderNode, sortedByInDegree[i]);
-  }
+}
 
-  // Mark for extraction nodes with out-degree > Q3 + (Q3 - Q1) * 4.
-  let sortedByOutDegree = Object.keys(nodeToOutDegree).sort((node0, node1) => {
-    return nodeToOutDegree[node0] - nodeToOutDegree[node1];
-  });
-  let outDegreeQ3 = nodeToOutDegree[sortedByOutDegree[q3Index]];
-  let outDegreeQ1 = nodeToOutDegree[sortedByOutDegree[q1Index]];
-  // The upper bound for extracting out-degree nodes is higher than that for
-  // extracting in-degree ones (Note the "* 4") because, in practice, some
-  // graphs look worse with a smaller out-degree bound. For instance, a smaller
-  // out-degree bound removes the convolution nodes from cifar 10 train's graph.
-  let outDegreeUpperBound = outDegreeQ3 + (outDegreeQ3 - outDegreeQ1) * 4;
-  // Only extract if the upper bound is high enough.
-  outDegreeUpperBound = Math.max(outDegreeUpperBound, minUpperBound);
-  for (let i = validNodeCount - 1;
-       nodeToOutDegree[sortedByOutDegree[i]] > outDegreeUpperBound; i--) {
-    let node = graph.node(sortedByOutDegree[i]);
-    if (!node || node.isInExtract) {
-      // This node has already been extracted due to high in-degree. It might
-      // have been removed from the graph in general (during in-degree
-      // extraction) due to a lack of neighbors. Do not extract this node twice.
-      continue;
+/** Extract nodes with out-degree > maxOutDegree */
+function extractHighOutDegree(renderNode: RenderGroupNodeInfo) {
+  let graph = renderNode.coreGraph;
+  let maxOutDegree = PARAMS.maxOutDegree;
+
+  // detect first so degrees don't get affected by other removal
+  let highOutDegreeNames = _.filter(graph.nodes(), n => {
+    if (graph.node(n).node.include !== InclusionType.UNSPECIFIED) {
+      return false;
     }
+    // Count the out-degree based on only regular edges, unless there are
+    // no regular edges, in which case use the number of control edges.
+    // This is done so that control edges don't effect if nodes are extracted
+    // from the core graph, unless the node is only used for control.
+    let numEdgesToCount = _.reduce(graph.successors(n),
+        (numEdgesToCount, succ) => {
+      let metaedge = graph.edge(n, succ).metaedge;
+      return numEdgesToCount + (metaedge.numRegularEdges ? 1 : 0);
+    }, 0);
+    if (numEdgesToCount === 0 && graph.successors(n).length > 0) {
+      numEdgesToCount = graph.successors(n).length;
+    }
+    return numEdgesToCount > maxOutDegree;
+  });
 
-    // Extract a high out-degree node that has not already been extracted.
-    makeOutExtract(renderNode, sortedByOutDegree[i]);
-  }
+  _.each(highOutDegreeNames, n => {
+    makeInExtract(renderNode, n);
+  });
 }
 
 /** Remove control edges from nodes that have too many control edges */
@@ -1526,7 +1475,17 @@ function extractHighDegrees(renderNode: RenderGroupNodeInfo) {
     extractPredefinedSource(renderNode);
   }
 
-  extractHighInOrOutDegree(renderNode);
+  // This has to come before extract high out-degree to protect the core part
+  // that output to many places as there are more high-degree sinks than
+  // sources.
+
+  if (PARAMS.maxInDegree) {
+    extractHighInDegree(renderNode);
+  }
+
+  if (PARAMS.maxOutDegree) {
+    extractHighOutDegree(renderNode);
+  }
 
   if (PARAMS.maxControlDegree) {
     removeControlEdges(renderNode);

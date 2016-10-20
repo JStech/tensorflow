@@ -254,10 +254,6 @@ CUPTIManager *GetCUPTIManager() {
   return manager;
 }
 
-#ifdef _MSC_VER
-#define __thread __declspec(thread) 
-#endif
-
 // TODO(pbar) Move this to platform specific header file?
 // Static thread local variable for POD types.
 #define TF_STATIC_THREAD_LOCAL_POD(_Type_, _var_)                  \

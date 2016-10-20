@@ -14,14 +14,13 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/lib/io/random_inputstream.h"
+#include "tensorflow/core/lib/io/inputbuffer.h"
 #include "tensorflow/core/lib/io/zlib_compression_options.h"
-#include "tensorflow/core/lib/io/zlib_inputstream.h"
+#include "tensorflow/core/lib/io/zlib_inputbuffer.h"
 #include "tensorflow/core/lib/io/zlib_outputbuffer.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 
 namespace tensorflow {
-namespace io {
 
 static std::vector<int> InputBufferSizes() {
   return {10, 100, 200, 500, 1000, 10000};
@@ -48,7 +47,7 @@ static string GetRecord() {
   return lorem_ipsum;
 }
 
-static string GenTestString(int copies = 1) {
+static string GenTestString(uint copies = 1) {
   string result = "";
   for (int i = 0; i < copies; i++) {
     result += GetRecord();
@@ -71,9 +70,8 @@ void TestAllCombinations(CompressionOptions input_options,
         TF_CHECK_OK(env->NewWritableFile(fname, &file_writer));
         string result;
 
-        ZlibOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                             output_options);
-        TF_CHECK_OK(out.Init());
+        io::ZlibOutputBuffer out(file_writer.get(), input_buf_size,
+                                 output_buf_size, output_options);
 
         TF_CHECK_OK(out.Write(StringPiece(data)));
         TF_CHECK_OK(out.Close());
@@ -82,11 +80,9 @@ void TestAllCombinations(CompressionOptions input_options,
 
         std::unique_ptr<RandomAccessFile> file_reader;
         TF_CHECK_OK(env->NewRandomAccessFile(fname, &file_reader));
-        std::unique_ptr<RandomAccessInputStream> input_stream(
-            new RandomAccessInputStream(file_reader.get()));
-        ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                           input_options);
-        TF_EXPECT_OK(in.ReadNBytes(data.size(), &result));
+        io::ZlibInputBuffer in(file_reader.get(), input_buf_size,
+                               output_buf_size, input_options);
+        TF_CHECK_OK(in.ReadNBytes(data.size(), &result));
         EXPECT_EQ(result, data);
       }
     }
@@ -119,9 +115,8 @@ void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
   string expected_result;
 
   TF_CHECK_OK(env->NewWritableFile(fname, &file_writer));
-  ZlibOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                       output_options);
-  TF_CHECK_OK(out.Init());
+  io::ZlibOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
+                           output_options);
 
   for (int i = 0; i < num_writes; i++) {
     TF_CHECK_OK(out.Write(StringPiece(data)));
@@ -136,14 +131,12 @@ void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
 
   std::unique_ptr<RandomAccessFile> file_reader;
   TF_CHECK_OK(env->NewRandomAccessFile(fname, &file_reader));
-  std::unique_ptr<RandomAccessInputStream> input_stream(
-      new RandomAccessInputStream(file_reader.get()));
-  ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                     input_options);
+  io::ZlibInputBuffer in(file_reader.get(), input_buf_size, output_buf_size,
+                         input_options);
 
   for (int i = 0; i < num_writes; i++) {
     string decompressed_output;
-    TF_EXPECT_OK(in.ReadNBytes(data.size(), &decompressed_output));
+    TF_CHECK_OK(in.ReadNBytes(data.size(), &decompressed_output));
     strings::StrAppend(&actual_result, decompressed_output);
   }
 
@@ -158,7 +151,7 @@ TEST(ZlibBuffers, MultipleWriteCallsWithFlush) {
   TestMultipleWrites(200, 200, 10, true);
 }
 
-TEST(ZlibInputStream, FailsToReadIfWindowBitsAreIncompatible) {
+TEST(ZlibInputBuffer, FailsToReadIfWindowBitsAreIncompatible) {
   Env* env = Env::Default();
   string fname = testing::TmpDir() + "/zlib_buffers_test";
   CompressionOptions output_options = CompressionOptions::DEFAULT();
@@ -172,9 +165,8 @@ TEST(ZlibInputStream, FailsToReadIfWindowBitsAreIncompatible) {
   std::unique_ptr<WritableFile> file_writer;
   TF_CHECK_OK(env->NewWritableFile(fname, &file_writer));
   string result;
-  ZlibOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                       output_options);
-  TF_CHECK_OK(out.Init());
+  io::ZlibOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
+                           output_options);
 
   TF_CHECK_OK(out.Write(StringPiece(data)));
   TF_CHECK_OK(out.Close());
@@ -183,14 +175,11 @@ TEST(ZlibInputStream, FailsToReadIfWindowBitsAreIncompatible) {
 
   std::unique_ptr<RandomAccessFile> file_reader;
   TF_CHECK_OK(env->NewRandomAccessFile(fname, &file_reader));
-  std::unique_ptr<RandomAccessInputStream> input_stream(
-      new RandomAccessInputStream(file_reader.get()));
-  ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                     input_options);
+  io::ZlibInputBuffer in(file_reader.get(), input_buf_size, output_buf_size,
+                         input_options);
   Status read_status = in.ReadNBytes(data.size(), &result);
   CHECK_EQ(read_status.code(), error::DATA_LOSS);
   CHECK(read_status.error_message().find("inflate() failed") != string::npos);
 }
 
-}  // namespace io
 }  // namespace tensorflow

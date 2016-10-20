@@ -21,13 +21,10 @@ limitations under the License.
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/core/stringpiece.h"
-#include "tensorflow/core/lib/io/buffered_inputstream.h"
-#include "tensorflow/core/lib/io/inputstream_interface.h"
-#include "tensorflow/core/lib/io/random_inputstream.h"
 #include "tensorflow/core/lib/io/path.h"
+#include "tensorflow/core/lib/io/match.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_statistics.h"
-#include "tensorflow/core/platform/file_system.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
 %}
 
@@ -69,8 +66,9 @@ void WriteStringToFile(const string& filename, const string& file_content,
 std::vector<string> GetMatchingFiles(const string& filename,
                                      TF_Status* out_status) {
   std::vector<string> results;
-  tensorflow::Status status = tensorflow::Env::Default()->GetMatchingPaths(
-      filename, &results);
+  tensorflow::Status status =
+      tensorflow::io::GetMatchingFiles(tensorflow::Env::Default(), filename,
+          &results);
   if (!status.ok()) {
     Set_TF_Status_from_Status(out_status, status);
   }
@@ -80,14 +78,6 @@ std::vector<string> GetMatchingFiles(const string& filename,
 void CreateDir(const string& dirname, TF_Status* out_status) {
   tensorflow::Status status = tensorflow::Env::Default()->CreateDir(dirname);
   if (!status.ok() && status.code() != tensorflow::error::ALREADY_EXISTS) {
-    Set_TF_Status_from_Status(out_status, status);
-  }
-}
-
-void RecursivelyCreateDir(const string& dirname, TF_Status* out_status) {
-  tensorflow::Status status = tensorflow::Env::Default()->RecursivelyCreateDir(
-      dirname);
-  if (!status.ok()) {
     Set_TF_Status_from_Status(out_status, status);
   }
 }
@@ -165,67 +155,7 @@ void Stat(const string& filename, FileStatistics* stats,
     Set_TF_Status_from_Status(out_status, status);
   }
 }
-
-tensorflow::io::BufferedInputStream* CreateBufferedInputStream(
-    const string& filename, size_t buffer_size, TF_Status* out_status) {
-  std::unique_ptr<tensorflow::RandomAccessFile> file;
-  tensorflow::Status status =
-      tensorflow::Env::Default()->NewRandomAccessFile(filename, &file);
-  if (!status.ok()) {
-    Set_TF_Status_from_Status(out_status, status);
-    return nullptr;
-  }
-  std::unique_ptr<tensorflow::io::RandomAccessInputStream> input_stream(
-      new tensorflow::io::RandomAccessInputStream(
-          file.release(), true /* owns_file */));
-  std::unique_ptr<tensorflow::io::BufferedInputStream> buffered_input_stream(
-      new tensorflow::io::BufferedInputStream(
-          input_stream.release(), buffer_size, true /* owns_input_stream */));
-  return buffered_input_stream.release();
-}
-
-tensorflow::WritableFile* CreateWritableFile(
-    const string& filename, const string& mode, TF_Status* out_status) {
-  std::unique_ptr<tensorflow::WritableFile> file;
-  tensorflow::Status status;
-  if (mode.find("a") != std::string::npos) {
-    status = tensorflow::Env::Default()->NewAppendableFile(filename, &file);
-  } else {
-    status = tensorflow::Env::Default()->NewWritableFile(filename, &file);
-  }
-  if (!status.ok()) {
-    Set_TF_Status_from_Status(out_status, status);
-    return nullptr;
-  }
-  return file.release();
-}
-
-void AppendToFile(const string& file_content, tensorflow::WritableFile* file,
-                  TF_Status* out_status) {
-  tensorflow::Status status = file->Append(file_content);
-  if (!status.ok()) {
-    Set_TF_Status_from_Status(out_status, status);
-  }
-}
-
-string ReadFromStream(tensorflow::io::BufferedInputStream* stream,
-                      size_t bytes,
-                      TF_Status* out_status) {
-  string result;
-  tensorflow::Status status = stream->ReadNBytes(bytes, &result);
-  if (!status.ok()) {
-    Set_TF_Status_from_Status(out_status, status);
-    result.clear();
-  }
-  return result;
-}
-
 %}
-
-// Ensure that the returned object is destroyed when its wrapper is
-// garbage collected.
-%newobject CreateBufferedInputStream;
-%newobject CreateWritableFile;
 
 // Wrap the above functions.
 inline bool FileExists(const string& filename);
@@ -236,7 +166,6 @@ void WriteStringToFile(const string& filename, const string& file_content,
 std::vector<string> GetMatchingFiles(const string& filename,
                                      TF_Status* out_status);
 void CreateDir(const string& dirname, TF_Status* out_status);
-void RecursivelyCreateDir(const string& dirname, TF_Status* out_status);
 void CopyFile(const string& oldpath, const string& newpath, bool overwrite,
               TF_Status* out_status);
 void RenameFile(const string& oldname, const string& newname, bool overwrite,
@@ -245,35 +174,6 @@ void DeleteRecursively(const string& dirname, TF_Status* out_status);
 bool IsDirectory(const string& dirname, TF_Status* out_status);
 void Stat(const string& filename, tensorflow::FileStatistics* stats,
           TF_Status* out_status);
-tensorflow::io::BufferedInputStream* CreateBufferedInputStream(
-    const string& filename, size_t buffer_size, TF_Status* out_status);
-tensorflow::WritableFile* CreateWritableFile(const string& filename,
-                                             const string& mode,
-                                             TF_Status* out_status);
-void AppendToFile(const string& file_content, tensorflow::WritableFile* file,
-                  TF_Status* out_status);
-string ReadFromStream(tensorflow::io::BufferedInputStream* stream,
-                      size_t bytes,
-                      TF_Status* out_status);
 
-%ignore tensorflow::Status::operator=;
-%include "tensorflow/core/lib/core/status.h"
-
-%ignoreall
-%unignore tensorflow::io::BufferedInputStream;
-%unignore tensorflow::io::BufferedInputStream::~BufferedInputStream;
-%unignore tensorflow::io::BufferedInputStream::ReadLineAsString;
-%unignore tensorflow::io::BufferedInputStream::Seek;
-%unignore tensorflow::io::BufferedInputStream::Tell;
-%unignore tensorflow::WritableFile;
-%unignore tensorflow::WritableFile::Close;
-%unignore tensorflow::WritableFile::Flush;
-%unignore tensorflow::WritableFile::~WritableFile;
-%include "tensorflow/core/platform/file_system.h"
-%include "tensorflow/core/lib/io/inputstream_interface.h"
-%include "tensorflow/core/lib/io/buffered_inputstream.h"
-%unignoreall
-
-%include "tensorflow/c/tf_status_helper.h"
 %include "tensorflow/core/lib/io/path.h"
 %include "tensorflow/core/platform/file_statistics.h"

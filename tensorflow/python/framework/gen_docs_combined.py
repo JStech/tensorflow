@@ -55,15 +55,10 @@ def module_names():
       "tf.python_io",
       "tf.summary",
       "tf.test",
-      "tf.contrib.bayesflow.entropy",
-      "tf.contrib.bayesflow.monte_carlo",
       "tf.contrib.bayesflow.stochastic_graph",
-      "tf.contrib.bayesflow.stochastic_tensor",
       "tf.contrib.bayesflow.variational_inference",
       "tf.contrib.copy_graph",
-      "tf.contrib.crf",
       "tf.contrib.distributions",
-      "tf.contrib.distributions.bijector",
       "tf.contrib.ffmpeg",
       "tf.contrib.framework",
       "tf.contrib.graph_editor",
@@ -195,27 +190,14 @@ def all_libraries(module_to_name, members, documented):
               prefix=PREFIX_TEXT),
       library("summary", "Summary Operations", tf.summary),
       library("test", "Testing", tf.test),
-      library("contrib.bayesflow.entropy",
-              "BayesFlow Entropy (contrib)",
-              tf.contrib.bayesflow.entropy),
-      library("contrib.bayesflow.monte_carlo",
-              "BayesFlow Monte Carlo (contrib)",
-              tf.contrib.bayesflow.monte_carlo),
       library("contrib.bayesflow.stochastic_graph",
               "BayesFlow Stochastic Graph (contrib)",
               tf.contrib.bayesflow.stochastic_graph),
-      library("contrib.bayesflow.stochastic_tensor",
-              "BayesFlow Stochastic Tensors (contrib)",
-              tf.contrib.bayesflow.stochastic_tensor),
       library("contrib.bayesflow.variational_inference",
               "BayesFlow Variational Inference (contrib)",
               tf.contrib.bayesflow.variational_inference),
-      library("contrib.crf", "CRF (contrib)", tf.contrib.crf),
       library("contrib.distributions", "Statistical distributions (contrib)",
               tf.contrib.distributions),
-      library("contrib.distributions.bijector",
-              "Random variable transformations (contrib)",
-              tf.contrib.distributions.bijector),
       library("contrib.ffmpeg", "FFmpeg (contrib)", ffmpeg),
       library("contrib.framework", "Framework (contrib)", tf.contrib.framework),
       library("contrib.graph_editor", "Graph Editor (contrib)",
@@ -246,13 +228,7 @@ _hidden_symbols = ["Event", "LogMessage", "Summary", "SessionLog", "xrange",
 # conflict between tf.contrib.learn.NanLossDuringTrainingError and
 # tf.contrib.learn.monitors.NanLossDuringTrainingError, arising due
 # to imports in learn/python/learn/__init__.py
-# TODO(wicke): Remove contrib.layers.relu* after shortnames are
-# disabled.  These conflict with tf.nn.relu*
-EXCLUDE = frozenset(["tf.contrib.learn.monitors.NanLossDuringTrainingError",
-                     "tf.contrib.layers.relu", "tf.contrib.layers.relu6",
-                     "tf.contrib.framework.assert_global_step",
-                     "tf.contrib.framework.get_global_step",
-                     "tf.contrib.learn.NanLossDuringTrainingError"])
+EXCLUDE = frozenset(["tf.contrib.learn.monitors.NanLossDuringTrainingError"])
 
 
 def main(unused_argv):

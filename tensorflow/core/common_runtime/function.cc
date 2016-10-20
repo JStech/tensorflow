@@ -44,11 +44,7 @@ static const char* const kRetOp = "_Retval";
 static const char* const kGradientOp = "SymbolicGradient";
 static const char* const kNodeLabel = "Func";
 static const char* const kFuncAttr = "f";
-// kNoinlineAttr must start with an "_" to avoid collisions with
-// user-specified attrs.
-static const char* const kNoinlineAttr = "_noinline";
-// Old graphs use no "_".
-static const char* const kOldNoinlineAttr = "noinline";
+static const char* const kNoinlineAttr = "noinline";
 
 // Represents the index-th output of a node.
 struct Endpoint {
@@ -169,8 +165,6 @@ class FunctionLibraryRuntimeImpl : public FunctionLibraryRuntime {
   Device* device() override { return device_; }
   Env* env() override { return env_; }
 
-  string DebugString(Handle h) override;
-
  private:
   typedef FunctionLibraryRuntimeImpl ME;
 
@@ -196,7 +190,6 @@ class FunctionLibraryRuntimeImpl : public FunctionLibraryRuntime {
   // The instantiated and transformed function is encoded as a Graph
   // object, and an executor is created for the graph.
   struct Item : public core::RefCounted {
-    const Graph* graph = nullptr;  // Owned by exec.
     Executor* exec = nullptr;
 
     ~Item() override { delete this->exec; }
@@ -364,8 +357,6 @@ Status FunctionLibraryRuntimeImpl::InstantiateSymbolicGradient(
                                      func.name());
     }
     FunctionDef grad_fdef;
-    // TODO(josh11b): Should filter out the attrs from func that aren't used
-    // by the gradient function.
     TF_RETURN_IF_ERROR(creator(AttrSlice(&func.attr()), &grad_fdef));
     TF_RETURN_IF_ERROR(FunctionDefToBody(grad_fdef, func.attr(), g_body));
   } else {
@@ -477,7 +468,6 @@ Status FunctionLibraryRuntimeImpl::CreateItem(Handle handle, Item** item) {
   TF_RETURN_IF_ERROR(NewLocalExecutor(params, g, &exec));
 
   *item = new Item;
-  (*item)->graph = g;
   (*item)->exec = exec;
   return Status::OK();
 }
@@ -564,16 +554,6 @@ bool FunctionLibraryRuntimeImpl::IsStateful(const string& func) {
   const OpDef* op_def;
   const Status s = lib_def_->LookUpOpDef(func, &op_def);
   return s.ok() && op_def->is_stateful();
-}
-
-string FunctionLibraryRuntimeImpl::DebugString(Handle handle) {
-  Item* item = nullptr;
-  Status s = GetOrCreateItem(handle, &item);
-  if (s.ok()) {
-    return tensorflow::DebugString(item->graph);
-  } else {
-    return s.ToString();
-  }
 }
 
 FunctionLibraryRuntime* NewFunctionLibraryRuntime(
@@ -887,16 +867,12 @@ static void InlineFunctionBody(Graph* g, Node* caller,
 }
 
 // Given a node's NodeDef, returns false iff the node explicitly
-// specified _noinline. This gives ExpandInlineFunctions a heuristic to
+// specified noinline. This gives ExpandInlineFunctions a heuristic to
 // decide whether to inline the function.
-// `old` is true for GraphDef versions older than 12, when the
-// `noinline` attr was renamed to `_noinline` to avoid conflicts with
-// user-specified attrs.
-bool ShouldInline(const NodeDef& ndef, bool old) {
+bool ShouldInline(const NodeDef& ndef) {
   bool noinline = false;
-  const char* const attr = old ? kOldNoinlineAttr : kNoinlineAttr;
-  if (GetNodeAttr(ndef, attr, &noinline).ok()) {
-    // If the node specifies attribute '_noinline', returns accordingly.
+  if (GetNodeAttr(ndef, kNoinlineAttr, &noinline).ok()) {
+    // If the node specifies attribute 'noinlne', returns accordingly.
     return !noinline;
   }
   if (ndef.op() != kGradientOp) {
@@ -905,7 +881,7 @@ bool ShouldInline(const NodeDef& ndef, bool old) {
     return true;
   }
   // If the node is a SymbolicGradient, we use the forward
-  // function's attribute '_noinline' instead.
+  // function's attribute 'noinline' instead.
   const NameAttrList* forward_func_attrs;
   Status s =
       GetNodeAttr(AttrSlice(&ndef.attr()), kFuncAttr, &forward_func_attrs);
@@ -914,9 +890,10 @@ bool ShouldInline(const NodeDef& ndef, bool old) {
     // continue and the runtime will error out.
     return false;
   }
-  s = GetNodeAttr(AttrSlice(&forward_func_attrs->attr()), attr, &noinline);
+  s = GetNodeAttr(AttrSlice(&forward_func_attrs->attr()), kNoinlineAttr,
+                  &noinline);
   if (!s.ok()) {
-    // The forward function doesn't specify '_noinline' attr, we should
+    // The forward function doesn't specify 'noinline' attr, we should
     // be free to decide.
     return true;
   }
@@ -926,11 +903,9 @@ bool ShouldInline(const NodeDef& ndef, bool old) {
 
 bool ExpandInlineFunctions(FunctionLibraryRuntime* lib, Graph* graph) {
   std::vector<std::pair<Node*, const FunctionBody*>> candidates;
-  // Identify old graphs before the 'noinline' attr was renamed '_noinline'.
-  const bool old_inline_attr = graph->versions().producer() < 12;
   for (Node* node : graph->nodes()) {
     VLOG(3) << "Expanding " << node->DebugString();
-    if (!ShouldInline(node->def(), old_inline_attr)) {
+    if (!ShouldInline(node->def())) {
       VLOG(3) << "noinline: " << node->DebugString();
       continue;
     }

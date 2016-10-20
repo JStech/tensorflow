@@ -23,7 +23,7 @@ class ServerBuilder;
 namespace tensorflow {
 
 class AsyncServiceInterface;
-struct WorkerEnv;
+class WorkerEnv;
 
 // Returns an implementation of WorkerService rpc service.
 AsyncServiceInterface* NewGrpcWorkerService(WorkerEnv* env,

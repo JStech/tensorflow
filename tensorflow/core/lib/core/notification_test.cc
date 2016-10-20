@@ -76,11 +76,5 @@ TEST(NotificationTest, TestMultipleThreadsWaitingOnNotification) {
   EXPECT_EQ(4, counter);
 }
 
-TEST(NotificationTest, TestWaitWithTimeoutOnNotifiedNotification) {
-  Notification n;
-  n.Notify();
-  EXPECT_TRUE(WaitForNotificationWithTimeout(&n, 1000));
-}
-
 }  // namespace
 }  // namespace tensorflow

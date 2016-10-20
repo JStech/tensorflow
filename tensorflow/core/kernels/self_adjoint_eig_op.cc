@@ -28,10 +28,11 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <class Scalar>
-class SelfAdjointEigOp : public LinearAlgebraOp<Scalar> {
+template <class Scalar, bool SupportsBatchOperation>
+class SelfAdjointEigOp
+    : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
  public:
-  typedef LinearAlgebraOp<Scalar> Base;
+  typedef LinearAlgebraOp<Scalar, SupportsBatchOperation> Base;
 
   explicit SelfAdjointEigOp(OpKernelConstruction* context) : Base(context) {}
 
@@ -68,8 +69,10 @@ class SelfAdjointEigOp : public LinearAlgebraOp<Scalar> {
   }
 };
 
-REGISTER_LINALG_OP("SelfAdjointEig", (SelfAdjointEigOp<float>), float);
-REGISTER_LINALG_OP("SelfAdjointEig", (SelfAdjointEigOp<double>), double);
-REGISTER_LINALG_OP("BatchSelfAdjointEig", (SelfAdjointEigOp<float>), float);
-REGISTER_LINALG_OP("BatchSelfAdjointEig", (SelfAdjointEigOp<double>), double);
+REGISTER_LINALG_OP("SelfAdjointEig", (SelfAdjointEigOp<float, false>), float);
+REGISTER_LINALG_OP("SelfAdjointEig", (SelfAdjointEigOp<double, false>), double);
+REGISTER_LINALG_OP("BatchSelfAdjointEig", (SelfAdjointEigOp<float, true>),
+                   float);
+REGISTER_LINALG_OP("BatchSelfAdjointEig", (SelfAdjointEigOp<double, true>),
+                   double);
 }  // namespace tensorflow

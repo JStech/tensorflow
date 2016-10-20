@@ -73,8 +73,8 @@ template <typename FeatureType>
 struct RepeatedFieldTrait;
 
 template <>
-struct RepeatedFieldTrait<protobuf_int64> {
-  using Type = protobuf::RepeatedField<protobuf_int64>;
+struct RepeatedFieldTrait<int64> {
+  using Type = protobuf::RepeatedField<int64>;
 };
 
 template <>
@@ -95,7 +95,7 @@ struct FeatureTrait;
 template <typename ValueType>
 struct FeatureTrait<ValueType, typename std::enable_if<
                                    std::is_integral<ValueType>::value>::type> {
-  using Type = protobuf_int64;
+  using Type = int64;
 };
 
 template <typename ValueType>
@@ -178,8 +178,7 @@ void AppendFeatureValues(std::initializer_list<ValueType> container,
 }
 
 template <>
-bool ExampleHasFeature<protobuf_int64>(const string& name,
-                                       const Example& example);
+bool ExampleHasFeature<int64>(const string& name, const Example& example);
 
 template <>
 bool ExampleHasFeature<float>(const string& name, const Example& example);
@@ -188,12 +187,12 @@ template <>
 bool ExampleHasFeature<string>(const string& name, const Example& example);
 
 template <>
-const protobuf::RepeatedField<protobuf_int64>& GetFeatureValues<protobuf_int64>(
+const protobuf::RepeatedField<int64>& GetFeatureValues<int64>(
     const string& name, const Example& example);
 
 template <>
-protobuf::RepeatedField<protobuf_int64>* GetFeatureValues<protobuf_int64>(
-    const string& name, Example* example);
+protobuf::RepeatedField<int64>* GetFeatureValues<int64>(const string& name,
+                                                        Example* example);
 
 template <>
 const protobuf::RepeatedField<float>& GetFeatureValues<float>(

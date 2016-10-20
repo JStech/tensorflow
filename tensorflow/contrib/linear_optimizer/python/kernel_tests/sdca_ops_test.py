@@ -19,9 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 from threading import Thread
-
 import tensorflow as tf
 
+from tensorflow.contrib.linear_optimizer.python.ops.sdca_ops import _sdca_ops
 from tensorflow.contrib.linear_optimizer.python.ops.sdca_ops import _ShardedMutableHashTable
 from tensorflow.contrib.linear_optimizer.python.ops.sdca_ops import SdcaModel
 from tensorflow.contrib.linear_optimizer.python.ops.sdca_ops import SparseFeatureColumn
@@ -30,7 +30,7 @@ from tensorflow.python.platform import googletest
 
 _MAX_ITERATIONS = 100
 _SHARD_NUMBERS = [None, 1, 3, 10]
-_NUM_LOSS_PARTITIONS = [2, 4]
+_NUM_PARTITIONS = [2, 4]
 
 def make_example_proto(feature_dict, target, value=1.0):
   e = tf.train.Example()
@@ -189,7 +189,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
         # The high tolerance in unregularized_loss comparisons is due to the
         # fact that it's possible to trade off unregularized_loss vs.
         # regularization and still have a sum that is quite close to the
@@ -216,7 +215,7 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
     ]
     example_weights = [1.0, 1.0]
     for num_shards in _SHARD_NUMBERS:
-      for num_loss_partitions in _NUM_LOSS_PARTITIONS:
+      for num_partitions in _NUM_PARTITIONS:
         with self._single_threaded_test_session():
           examples = make_example_dict(example_protos, example_weights)
           variables = make_variable_dict(1, 1)
@@ -225,7 +224,7 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
               symmetric_l1_regularization=0,
               loss_type='logistic_loss',
               num_table_shards=num_shards,
-              num_loss_partitions=num_loss_partitions)
+              num_partitions=num_partitions)
 
           lr = SdcaModel(examples, variables, options)
           tf.initialize_all_variables().run()
@@ -243,13 +242,12 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
                 train_op.run()
 
           threads = []
-          for _ in range(num_loss_partitions):
+          for _ in range(num_partitions):
             threads.append(Thread(target=Minimize))
             threads[-1].start()
 
           for t in threads:
             t.join()
-          lr.update_weights(train_op).run()
 
           # The high tolerance in unregularized_loss comparisons is due to the
           # fact that it's possible to trade off unregularized_loss vs.
@@ -296,7 +294,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
 
         # There is neither L1 nor L2 loss, so regularized and unregularized
         # losses should be exactly the same.
@@ -349,7 +346,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
 
         self.assertAllClose(0.411608, unregularized_loss.eval(), atol=0.05)
         self.assertAllClose(0.525457, loss.eval(), atol=0.01)
@@ -420,7 +416,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
 
         self.assertAllClose(0.226487 + 0.102902,
                             unregularized_loss.eval(),
@@ -461,7 +456,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
 
         self.assertAllClose(0.284860, unregularized_loss.eval(), atol=0.08)
         self.assertAllClose(0.408044, loss.eval(), atol=0.012)
@@ -500,7 +494,6 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
         train_op = lr.minimize()
         for _ in range(_MAX_ITERATIONS):
           train_op.run()
-        lr.update_weights(train_op).run()
         self.assertAllClose(0.411608, unregularized_loss.eval(), atol=0.05)
         self.assertAllClose(0.525457, loss.eval(), atol=0.01)
         predicted_labels = get_binary_predictions_for_logistic(predictions)
@@ -530,7 +523,8 @@ class SdcaWithLogisticLossTest(SdcaModelTest):
       lr = SdcaModel(examples, variables, options)
       tf.initialize_all_variables().run()
       train_op = lr.minimize()
-      with self.assertRaisesRegexp(tf.errors.InvalidArgumentError, 'indices.*'):
+      with self.assertRaisesRegexp(tf.errors.InvalidArgumentError,
+                                   'Found sparse feature indices out.*'):
         train_op.run()
 
   def testOutOfRangeDenseFeatures(self):
@@ -587,7 +581,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # Predictions should be 2/3 of label due to minimizing regularized loss:
       #   (label - 2 * weight)^2 / 2 + L2 * 2 * weight^2
@@ -634,7 +627,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # Predictions should be 1/5 of label due to minimizing regularized loss:
       #   (label - 2 * weight)^2 + L2 * 16 * weight^2
@@ -670,7 +662,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # Predictions should be -4.0, 48/5 due to minimizing regularized loss:
       #   (label - 2 * weight)^2 / 2 + L2 * 2 * weight^2 + L1 * 4 * weight
@@ -706,7 +697,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # There are 4 (sparse) variable weights to be learned. 2 for age and 2 for
       # gender. Let w_1, w_2 be age weights, w_3, w_4 be gender weights, y_1,
@@ -740,7 +730,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # The loss function for these particular features is given by:
       # 1/2(label_1-w_1)^2 + 1/2(label_2-w_2)^2 + \lambda/2 (w_1^2 + w_2^2). So,
@@ -771,7 +760,6 @@ class SdcaWithLinearLossTest(SdcaModelTest):
       train_op = lr.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      lr.update_weights(train_op).run()
 
       # The loss function for these particular features is given by:
       # 1/2 s_1 (label_1-w_1)^2 + 1/2 s_2(label_2-w_2)^2 +
@@ -829,7 +817,6 @@ class SdcaWithHingeLossTest(SdcaModelTest):
       train_op = model.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      model.update_weights(train_op).run()
 
       binary_predictions = get_binary_predictions_for_hinge(predictions)
       self.assertAllEqual([-1.0, 1.0], predictions.eval())
@@ -855,7 +842,6 @@ class SdcaWithHingeLossTest(SdcaModelTest):
       train_op = model.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      model.update_weights(train_op).run()
 
       self.assertAllClose([1.0, -1.0], predictions.eval(), atol=0.05)
       self.assertAllEqual([1, 0], binary_predictions.eval())
@@ -886,7 +872,6 @@ class SdcaWithHingeLossTest(SdcaModelTest):
       train_op = model.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      model.update_weights(train_op).run()
 
       # (1.0, 0.5) and (1.0, -0.5) are separable by x-axis but the datapoints
       # are within the margins so there is unregularized loss (1/2 per example).
@@ -915,7 +900,6 @@ class SdcaWithHingeLossTest(SdcaModelTest):
       train_op = model.minimize()
       for _ in range(_MAX_ITERATIONS):
         train_op.run()
-      model.update_weights(train_op).run()
 
       # Point (1.0, 0.5) has higher weight than (1.0, -0.5) so the model will
       # try to increase the margin from (1.0, 0.5). Due to regularization,
@@ -930,53 +914,6 @@ class SdcaWithHingeLossTest(SdcaModelTest):
       regularized_loss = model.regularized_loss(examples)
       self.assertAllClose(0.2, unregularized_loss.eval(), atol=0.02)
       self.assertAllClose(0.4, regularized_loss.eval(), atol=0.02)
-
-
-class SdcaWithSmoothHingeLossTest(SdcaModelTest):
-  """SDCA optimizer test class for smooth hinge loss."""
-
-  def testSimple(self):
-    # Setup test data
-    example_protos = [
-        make_example_proto({'age': [0],
-                            'gender': [0]}, 0),
-        make_example_proto({'age': [1],
-                            'gender': [1]}, 1),
-    ]
-    example_weights = [1.0, 1.0]
-    with self._single_threaded_test_session():
-      examples = make_example_dict(example_protos, example_weights)
-      variables = make_variable_dict(1, 1)
-      options = dict(
-          symmetric_l2_regularization=1.0,
-          symmetric_l1_regularization=0,
-          loss_type='smooth_hinge_loss')
-      model = SdcaModel(examples, variables, options)
-      tf.initialize_all_variables().run()
-
-      # Before minimization, the weights default to zero. There is no loss due
-      # to regularization, only unregularized loss which is 0.5 * (1+1) = 1.0.
-      predictions = model.predictions(examples)
-      self.assertAllClose([0.0, 0.0], predictions.eval())
-      unregularized_loss = model.unregularized_loss(examples)
-      regularized_loss = model.regularized_loss(examples)
-      self.assertAllClose(1.0, unregularized_loss.eval())
-      self.assertAllClose(1.0, regularized_loss.eval())
-
-      # After minimization, the model separates perfectly the data points. There
-      # are 4 sparse weights: 2 for age (say w1, w2) and 2 for gender (say w3
-      # and w4). The minimization leads to w1=w3=1/3 and w2=w4=-1/3. This gives
-      # an unregularized hinge loss of 0.33 and a 0.11 L2 loss
-      train_op = model.minimize()
-      for _ in range(_MAX_ITERATIONS):
-        train_op.run()
-      model.update_weights(train_op).run()
-
-      binary_predictions = get_binary_predictions_for_hinge(predictions)
-      self.assertAllClose([-0.67, 0.67], predictions.eval(), atol=0.05)
-      self.assertAllEqual([0, 1], binary_predictions.eval())
-      self.assertAllClose(0.33, unregularized_loss.eval(), atol=0.02)
-      self.assertAllClose(0.44, regularized_loss.eval(), atol=0.02)
 
 
 class SparseFeatureColumnTest(SdcaModelTest):
@@ -1013,11 +950,11 @@ class SdcaFprintTest(SdcaModelTest):
   def testFprint(self):
     with self._single_threaded_test_session():
       in_data = tf.constant(['abc', 'very looooooong string', 'def'])
-      out_data = tf.sdca.sdca_fprint(in_data)
+      out_data = _sdca_ops.sdca_fprint(in_data)
       self.assertAllEqual(
-          [b'\x04l\x12\xd2\xaf\xb2\x809E\x9e\x02\x13',
-           b'\x9f\x0f\x91P\x9aG.Ql\xf2Y\xf9',
-           b'"0\xe00"\x18_\x08\x12?\xa0\x17'], out_data.eval())
+          [b'\x04l\x12\xd2\xaf\xb2\x809E\x9e\x02\x13\x90\xf0\x85\xa0',
+           b'\x9f\x0f\x91P\x9aG.Ql\xf2Y\xf9M%Z\xbc',
+           b'"0\xe00"\x18_\x08\x12?\xa0\x17\xd8\x9c\x99y'], out_data.eval())
 
 
 class ShardedMutableHashTableTest(SdcaModelTest):
@@ -1045,27 +982,7 @@ class ShardedMutableHashTableTest(SdcaModelTest):
         result = output.eval()
         self.assertAllEqual([0, 1, -1], result)
 
-  def testExportSharded(self):
-    with self._single_threaded_test_session():
-      default_val = -1
-      num_shards = 2
-      keys = tf.constant(['a1', 'b1', 'c2'])
-      values = tf.constant([0, 1, 2], tf.int64)
-      table = _ShardedMutableHashTable(
-          tf.string, tf.int64, default_val, num_shards=num_shards)
-      self.assertAllEqual(0, table.size().eval())
-
-      table.insert(keys, values).run()
-      self.assertAllEqual(3, table.size().eval())
-
-      keys_list, values_list = table.export_sharded()
-      self.assertAllEqual(num_shards, len(keys_list))
-      self.assertAllEqual(num_shards, len(values_list))
-
-      self.assertAllEqual(set([b'b1', b'c2']), set(keys_list[0].eval()))
-      self.assertAllEqual([b'a1'], keys_list[1].eval())
-      self.assertAllEqual(set([1, 2]), set(values_list[0].eval()))
-      self.assertAllEqual([0], values_list[1].eval())
+        self.assertAllEqual(3, table.values_reduce_sum().eval())
 
 
 if __name__ == '__main__':

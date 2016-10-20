@@ -6,6 +6,7 @@ MAINTAINER Shanqing Cai <cais@google.com>
 COPY install/*.sh /install/
 RUN /install/install_bootstrap_deb_packages.sh
 RUN /install/install_deb_packages.sh
+RUN /install/install_proto3_from_source.sh
 
 RUN pip install --upgrade numpy
 

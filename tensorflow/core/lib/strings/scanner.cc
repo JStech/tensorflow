@@ -18,7 +18,7 @@ limitations under the License.
 namespace tensorflow {
 namespace strings {
 
-void Scanner::ScanUntilImpl(char end_ch, bool escaped) {
+void Scanner::ScanEscapedUntilImpl(char end_ch) {
   for (;;) {
     if (cur_.empty()) {
       Error();
@@ -30,7 +30,7 @@ void Scanner::ScanUntilImpl(char end_ch, bool escaped) {
     }
 
     cur_.remove_prefix(1);
-    if (escaped && ch == '\\') {
+    if (ch == '\\') {
       // Escape character, skip next character.
       if (cur_.empty()) {
         Error();

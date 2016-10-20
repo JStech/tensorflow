@@ -27,10 +27,9 @@ cc_library(
     ]),
     data = [
         "//tensorflow/core:cuda",
-        "@local_config_cuda//cuda:cublas",
-        "@local_config_cuda//cuda:cudnn",
-        "@local_config_cuda//cuda:cufft",
-        "@local_config_cuda//cuda:curand",
+        "//third_party/gpus/cuda:cublas",
+        "//third_party/gpus/cuda:cudnn",
+        "//third_party/gpus/cuda:cufft",
     ],
     linkopts = [
         "-ldl",
@@ -38,7 +37,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow/core:lib",
-        "@local_config_cuda//cuda:cuda_headers",
+        "//third_party/gpus/cuda:cuda_headers",
     ],
     alwayslink = 1,
 )

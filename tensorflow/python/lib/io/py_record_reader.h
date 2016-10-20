@@ -16,7 +16,6 @@ limitations under the License.
 #ifndef TENSORFLOW_PYTHON_LIB_IO_PY_RECORD_READER_H_
 #define TENSORFLOW_PYTHON_LIB_IO_PY_RECORD_READER_H_
 
-#include "tensorflow/c/c_api.h"
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
@@ -37,8 +36,7 @@ class PyRecordReader {
   // TODO(vrv): make this take a shared proto to configure
   // the compression options.
   static PyRecordReader* New(const string& filename, uint64 start_offset,
-                             const string& compression_type_string,
-                             TF_Status* out_status);
+                             const string& compression_type_string);
 
   ~PyRecordReader();
 

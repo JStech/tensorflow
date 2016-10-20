@@ -22,21 +22,11 @@ from tensorflow.contrib.learn.python.learn.experiment import Experiment
 from tensorflow.python.platform import tf_logging as logging
 
 
-def run(experiment_fn, output_dir, schedule=None):
+def run(experiment_fn, output_dir, schedule):
   """Make and run an experiment.
 
   It creates an Experiment by calling `experiment_fn`. Then it calls the
   function named as `schedule` of the Experiment.
-
-  If schedule is not provided, then the default schedule for the current task
-  type is used. The defaults are as follows:
-
-   * 'ps' maps to 'serve'
-   * 'worker' maps to 'train'
-   * 'master' maps to 'local_run'
-
-  If the experiment's config does not include a task type, then an exception
-  is raised.
 
   Example:
   ```
@@ -63,13 +53,14 @@ def run(experiment_fn, output_dir, schedule=None):
     The return value of function `schedule`.
 
   Raises:
-    ValueError: If `output_dir` is empty, `schedule` is None but no task
-      type is set in the built experiment's config, the task type has no
-      default, or `schedule` doesn't reference a member of `Experiment`.
+    ValueError: If output_dir or schedule is empty, or if `schedule` doesn't
+      references a member of `Experiment`.
     TypeError: `schedule` references non-callable member.
   """
   if not output_dir:
     raise ValueError('Must specify an output directory')
+  if not schedule:
+    raise ValueError('Must specify a schedule')
   if not callable(experiment_fn):
     raise TypeError('Experiment builder "%s" is not callable.' %
                     experiment_fn)
@@ -79,10 +70,6 @@ def run(experiment_fn, output_dir, schedule=None):
   if not isinstance(experiment, Experiment):
     raise TypeError('Experiment builder did not return an Experiment '
                     'instance, got %s instead.' % type(experiment))
-
-  # Get the schedule
-  config = experiment.estimator.config
-  schedule = schedule or _get_default_schedule(config)
 
   # Execute the schedule
   if not hasattr(experiment, schedule):
@@ -103,38 +90,3 @@ def run(experiment_fn, output_dir, schedule=None):
     raise TypeError('Schedule references non-callable member %s', schedule)
 
   return task()
-
-
-def _is_distributed(config):
-  """Returns true if this is a distributed job."""
-  if not config.cluster_spec:
-    return False
-
-  # This is considered a distributed job if there is more than one task
-  # in the cluster spec.
-  task_count = 0
-  for job in config.cluster_spec.jobs:
-    for _ in config.cluster_spec.job_tasks(job):
-      task_count += 1
-
-  return task_count > 1
-
-
-def _get_default_schedule(config):
-  """Returns the default schedule for the provided RunConfig."""
-  if not config or not _is_distributed(config):
-    return 'train_and_evaluate'
-
-  if not config.job_name:
-    raise ValueError('Must specify a schedule')
-
-  if config.job_name == 'master':
-    # TODO(rhaertel): handle the case where there is more than one master
-    # or explicitly disallow such a case.
-    return 'train_and_evaluate'
-  elif config.job_name == 'ps':
-    return 'run_std_server'
-  elif config.job_name == 'worker':
-    return 'train'
-
-  raise ValueError('No default schedule for task type: %s' % (config.job_name,))

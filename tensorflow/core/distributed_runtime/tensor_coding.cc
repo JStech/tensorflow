@@ -63,11 +63,11 @@ Status TensorResponse::InitFrom(RecvTensorResponse* response) {
   return s;
 }
 
-void TensorResponse::InitPartial(const RecvTensorResponse& response) {
+void TensorResponse::InitPartial(RecvTensorResponse* response) {
   // Everything except content is present in *response.  Content will
   // arrive later; allocate a Tensor with appropriate storage for that
   // content.
-  meta_ = response;
+  meta_.Swap(response);
   TensorShape shape(meta_.tensor().tensor_shape());
   Tensor t(allocator_, meta_.tensor().dtype(), shape);
   tensor_ = std::move(t);
@@ -75,22 +75,12 @@ void TensorResponse::InitPartial(const RecvTensorResponse& response) {
 
 Status TensorResponse::ParseFrom(Source* source) {
   if (!on_host_) {
-    protobuf::io::CodedInputStream input(source->contents());
-    input.SetTotalBytesLimit(INT_MAX, INT_MAX);  // Unlimited
-
     // Pre-parse into local storage, then delegate to device.
-    if (!meta_.ParseFromCodedStream(&input) || !input.ConsumedEntireMessage()) {
+    RecvTensorResponse proto;
+    if (!proto.ParseFromZeroCopyStream(source->contents())) {
       return errors::InvalidArgument("Cannot parse tensor from response");
     }
-    Status s =
-        device_->MakeTensorFromProto(meta_.tensor(), alloc_attrs_, &tensor_);
-    // Reduce memory usage for big tensors.
-    {
-      TensorProto empty;
-      meta_.mutable_tensor()->Swap(&empty);
-    }
-    meta_.clear_tensor();
-    return s;
+    return device_->MakeTensorFromProto(proto.tensor(), alloc_attrs_, &tensor_);
   }
   if (already_used_) {
     ClearTensor();
@@ -115,7 +105,7 @@ inline WireType GetTagWireType(uint32 tag) {
 }
 
 bool ReadVarintSizeAsInt(protobuf::io::CodedInputStream* input, int* result) {
-  protobuf_uint64 v;
+  uint64 v;
   if (input->ReadVarint64(&v) && v <= static_cast<uint64>(INT_MAX)) {
     *result = static_cast<int>(v);
     return true;
@@ -244,7 +234,7 @@ bool TensorResponse::ParseFast(Source* source) {
         break;
       }
       case RecvTensorResponse::kSendStartMicrosFieldNumber: {
-        protobuf_uint64 v;
+        uint64 v;
         if ((wt != WIRETYPE_VARINT) || !input.ReadVarint64(&v)) return false;
         meta_.set_send_start_micros(static_cast<int64>(v));
         break;

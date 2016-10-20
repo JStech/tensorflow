@@ -18,12 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
 import os
-
 import tensorflow as tf
-
 from tensorflow.contrib.learn.python.learn.datasets import mnist
+
 
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -33,7 +31,13 @@ TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
 TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
 
 
-FLAGS = None
+tf.app.flags.DEFINE_string('directory', '/tmp/data',
+                           'Directory to download data files and write the '
+                           'converted result')
+tf.app.flags.DEFINE_integer('validation_size', 5000,
+                            'Number of examples to separate from the training '
+                            'data for the validation set.')
+FLAGS = tf.app.flags.FLAGS
 
 
 def _int64_feature(value):
@@ -85,22 +89,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      '--directory',
-      type=str,
-      default='/tmp/data',
-      help='Directory to download data files and write the converted result'
-  )
-  parser.add_argument(
-      '--validation_size',
-      type=int,
-      default=5000,
-      help="""\
-      Number of examples to separate from the training data for the validation
-      set.\
-      """
-  )
-  FLAGS = parser.parse_args()
-
   tf.app.run()

@@ -24,13 +24,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
-
 import tensorflow as tf
 
 from tensorflow.examples.tutorials.mnist import input_data
 
-FLAGS = None
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+flags.DEFINE_boolean('fake_data', False, 'If true, uses fake data '
+                     'for unit testing.')
+flags.DEFINE_integer('max_steps', 1000, 'Number of steps to run trainer.')
+flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
+flags.DEFINE_float('dropout', 0.9, 'Keep probability for training dropout.')
+flags.DEFINE_string('data_dir', '/tmp/data', 'Directory for storing data')
+flags.DEFINE_string('summaries_dir', '/tmp/mnist_logs', 'Summaries directory')
 
 
 def train():
@@ -69,8 +75,8 @@ def train():
       mean = tf.reduce_mean(var)
       tf.scalar_summary('mean/' + name, mean)
       with tf.name_scope('stddev'):
-        stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-      tf.scalar_summary('stddev/' + name, stddev)
+        stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
+      tf.scalar_summary('sttdev/' + name, stddev)
       tf.scalar_summary('max/' + name, tf.reduce_max(var))
       tf.scalar_summary('min/' + name, tf.reduce_min(var))
       tf.histogram_summary(name, var)
@@ -94,7 +100,7 @@ def train():
       with tf.name_scope('Wx_plus_b'):
         preactivate = tf.matmul(input_tensor, weights) + biases
         tf.histogram_summary(layer_name + '/pre_activations', preactivate)
-      activations = act(preactivate, name='activation')
+      activations = act(preactivate, 'activation')
       tf.histogram_summary(layer_name + '/activations', activations)
       return activations
 
@@ -105,23 +111,12 @@ def train():
     tf.scalar_summary('dropout_keep_probability', keep_prob)
     dropped = tf.nn.dropout(hidden1, keep_prob)
 
-  # Do not apply softmax activation yet, see below.
-  y = nn_layer(dropped, 500, 10, 'layer2', act=tf.identity)
+  y = nn_layer(dropped, 500, 10, 'layer2', act=tf.nn.softmax)
 
   with tf.name_scope('cross_entropy'):
-    # The raw formulation of cross-entropy,
-    #
-    # tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(tf.softmax(y)),
-    #                               reduction_indices=[1]))
-    #
-    # can be numerically unstable.
-    #
-    # So here we use tf.nn.softmax_cross_entropy_with_logits on the
-    # raw outputs of the nn_layer above, and then average across
-    # the batch.
-    diff = tf.nn.softmax_cross_entropy_with_logits(y, y_)
+    diff = y_ * tf.log(y)
     with tf.name_scope('total'):
-      cross_entropy = tf.reduce_mean(diff)
+      cross_entropy = -tf.reduce_mean(diff)
     tf.scalar_summary('cross entropy', cross_entropy)
 
   with tf.name_scope('train'):
@@ -187,19 +182,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--fake_data', nargs='?', const=True, type=bool,
-                      default=False,
-                      help='If true, uses fake data for unit testing.')
-  parser.add_argument('--max_steps', type=int, default=1000,
-                      help='Number of steps to run trainer.')
-  parser.add_argument('--learning_rate', type=float, default=0.001,
-                      help='Initial learning rate')
-  parser.add_argument('--dropout', type=float, default=0.9,
-                      help='Keep probability for training dropout.')
-  parser.add_argument('--data_dir', type=str, default='/tmp/data',
-                      help='Directory for storing data')
-  parser.add_argument('--summaries_dir', type=str, default='/tmp/mnist_logs',
-                      help='Summaries directory')
-  FLAGS = parser.parse_args()
   tf.app.run()

@@ -137,7 +137,7 @@ cc_library(
     deps = [
         ":call_options",
         ":master_env",
-        ":master_session",
+        ":master_session_interface",
         ":remote_device",
         ":worker_cache",
         ":worker_interface",
@@ -145,7 +145,6 @@ cc_library(
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
-        "//tensorflow/core:lib_internal",
         "//tensorflow/core:master_proto_cc",
         "//tensorflow/core:worker_proto_cc",
     ],
@@ -156,9 +155,8 @@ cc_library(
     srcs = ["master_session.cc"],
     hdrs = ["master_session.h"],
     deps = [
-        ":call_options",
         ":master_env",
-        ":scheduler",
+        ":master_session_interface",
         ":worker_cache",
         ":worker_interface",
         "//tensorflow/core:core_cpu",
@@ -181,14 +179,10 @@ cc_library(
 )
 
 cc_library(
-    name = "scheduler",
-    srcs = ["scheduler.cc"],
-    hdrs = ["scheduler.h"],
-    deps = [
-        "//tensorflow/core:core_cpu_internal",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:tensorflow_opensource",
-    ],
+    name = "master_session_interface",
+    srcs = [],
+    hdrs = ["master_session_interface.h"],
+    deps = ["//tensorflow/core:lib"],
 )
 
 cc_library(
@@ -269,12 +263,12 @@ cc_library(
 # on grpc_testlib.
 tf_cuda_cc_tests(
     size = "medium",
-    srcs = [
+    linkstatic = tf_kernel_tests_linkstatic(),
+    tags = tf_cuda_tests_tags(),
+    tests = [
         "executor_test.cc",
         #"master_test.cc",  # TODO(b/27683709): Re-enable when not flaky.
     ],
-    linkstatic = tf_kernel_tests_linkstatic(),
-    tags = tf_cuda_tests_tags(),
     deps = [
         ":master",
         ":remote_device",
@@ -305,11 +299,11 @@ tf_cuda_cc_tests(
 
 tf_cuda_cc_tests(
     size = "small",
-    srcs = [
-        "remote_device_test.cc",
-    ],
     linkstatic = tf_kernel_tests_linkstatic(),
     tags = tf_cuda_tests_tags() + ["manual"],
+    tests = [
+        "remote_device_test.cc",
+    ],
     deps = [
         ":master",
         ":remote_device",

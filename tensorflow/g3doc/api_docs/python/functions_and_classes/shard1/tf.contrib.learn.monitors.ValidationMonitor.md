@@ -179,8 +179,6 @@ Callback before every n'th step begins.
 
 A setter called automatically by the target estimator.
 
-If the estimator is locked, this method does nothing.
-
 ##### Args:
 
 

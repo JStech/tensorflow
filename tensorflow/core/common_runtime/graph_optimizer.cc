@@ -45,7 +45,7 @@ void GraphOptimizer::Optimize(FunctionLibraryRuntime* runtime, Env* env,
   const int kMaxRounds = 10;
   for (int rounds = 0; rounds < kMaxRounds; ++rounds) {
     changed = false;
-    if (RemoveListArrayConverter(g)) {
+    if (opts_.do_function_inlining() && RemoveListArrayConverter(g)) {
       DumpGraph("RemoveListArrayConverter", g);
       changed = true;
     }

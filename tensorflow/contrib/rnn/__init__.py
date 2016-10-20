@@ -16,15 +16,8 @@
 
 ## This package provides additional contributed RNNCells.
 
-### Block RNNCells
-@@LSTMBlockCell
-@@GRUBlockCell
-
 ### Fused RNNCells
-@@FusedRNNCell
-@@FusedRNNCellAdaptor
-@@TimeReversedFusedRNN
-@@LSTMBlockFusedCell
+@@LSTMBlockCell
 
 ### LSTM-like cells
 @@CoupledInputForgetGateLSTMCell
@@ -40,8 +33,5 @@ from __future__ import division
 from __future__ import print_function
 
 # pylint: disable=unused-import,wildcard-import, line-too-long
-from tensorflow.contrib.rnn.python.ops.fused_rnn_cell import *
-from tensorflow.contrib.rnn.python.ops.gru_ops import *
 from tensorflow.contrib.rnn.python.ops.lstm_ops import *
-from tensorflow.contrib.rnn.python.ops.rnn import *
 from tensorflow.contrib.rnn.python.ops.rnn_cell import *

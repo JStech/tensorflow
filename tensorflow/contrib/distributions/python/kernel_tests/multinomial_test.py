@@ -41,7 +41,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual(tf.TensorShape([2]), dist.get_event_shape())
       self.assertEqual(tf.TensorShape([3, 2]), dist.get_batch_shape())
 
-  def testN(self):
+  def testNProperty(self):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
     n = [[3.], [4]]
     with self.test_session():
@@ -49,7 +49,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((2, 1), dist.n.get_shape())
       self.assertAllClose(n, dist.n.eval())
 
-  def testP(self):
+  def testPProperty(self):
     p = [[0.1, 0.2, 0.7]]
     with self.test_session():
       dist = tf.contrib.distributions.Multinomial(n=3., p=p)
@@ -57,43 +57,39 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((1, 3), dist.logits.get_shape())
       self.assertAllClose(p, dist.p.eval())
 
-  def testLogits(self):
-    p = np.array([[0.1, 0.2, 0.7]], dtype=np.float32)
-    logits = np.log(p) - 50.
+  def testLogitsProperty(self):
+    logits = [[0., 9., -0.5]]
     with self.test_session():
       multinom = tf.contrib.distributions.Multinomial(n=3., logits=logits)
       self.assertEqual((1, 3), multinom.p.get_shape())
       self.assertEqual((1, 3), multinom.logits.get_shape())
-      self.assertAllClose(p, multinom.p.eval())
       self.assertAllClose(logits, multinom.logits.eval())
 
   def testPmfNandCountsAgree(self):
     p = [[0.1, 0.2, 0.7]]
     n = [[5.]]
     with self.test_session():
-      dist = tf.contrib.distributions.Multinomial(
-          n=n, p=p, validate_args=True)
+      dist = tf.contrib.distributions.Multinomial(n=n, p=p)
       dist.pmf([2., 3, 0]).eval()
       dist.pmf([3., 0, 2]).eval()
-      with self.assertRaisesOpError("Condition x >= 0.*"):
+      with self.assertRaisesOpError('Condition x >= 0.*'):
         dist.pmf([-1., 4, 2]).eval()
-      with self.assertRaisesOpError("counts do not sum to n"):
+      with self.assertRaisesOpError('counts do not sum to n'):
         dist.pmf([3., 3, 0]).eval()
 
-  def testPmfNonIntegerCounts(self):
+  def testPmf_non_integer_counts(self):
     p = [[0.1, 0.2, 0.7]]
     n = [[5.]]
     with self.test_session():
       # No errors with integer n.
-      multinom = tf.contrib.distributions.Multinomial(
-          n=n, p=p, validate_args=True)
+      multinom = tf.contrib.distributions.Multinomial(n=n, p=p)
       multinom.pmf([2., 1, 2]).eval()
       multinom.pmf([3., 0, 2]).eval()
       # Counts don't sum to n.
-      with self.assertRaisesOpError("counts do not sum to n"):
+      with self.assertRaisesOpError('counts do not sum to n'):
         multinom.pmf([2., 3, 2]).eval()
       # Counts are non-integers.
-      with self.assertRaisesOpError("Condition x == y.*"):
+      with self.assertRaisesOpError('Condition x == y.*'):
         multinom.pmf([1.0, 2.5, 1.5]).eval()
 
       multinom = tf.contrib.distributions.Multinomial(
@@ -154,7 +150,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertAllClose(pmf.eval(), [0.1, 0.7])
       self.assertEqual(pmf.get_shape(), (2))
 
-  def testPmfShapeCountsStretchedN(self):
+  def testPmfShapeCountsStretched_N(self):
     with self.test_session():
       # [2, 2, 2]
       p = [[[0.1, 0.9], [0.1, 0.9]], [[0.7, 0.3], [0.7, 0.3]]]
@@ -166,7 +162,7 @@ class MultinomialTest(tf.test.TestCase):
       pmf.eval()
       self.assertEqual(pmf.get_shape(), (2, 2))
 
-  def testPmfShapeCountsPStretchedN(self):
+  def testPmfShapeCountsPStretched_N(self):
     with self.test_session():
       p = [0.1, 0.9]
       counts = [3., 2]
@@ -194,7 +190,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((3, 3), dist.variance().get_shape())
       self.assertAllClose(expected_variances, dist.variance().eval())
 
-  def testMultinomialVarianceBatch(self):
+  def testMultinomialVariance_batch(self):
     with self.test_session():
       # Shape [2]
       n = [5.] * 2
@@ -208,7 +204,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((4, 2, 2, 2), dist.variance().get_shape())
       self.assertAllClose(expected_variances, dist.variance().eval())
 
-  def testVarianceMultidimensional(self):
+  def testVariance_multidimensional(self):
     # Shape [3, 5, 4]
     p = np.random.dirichlet([.25, .25, .25, .25], [3, 5]).astype(np.float32)
     # Shape [6, 3, 3]
@@ -226,5 +222,5 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((3, 5, 4, 4), variance.get_shape())
       self.assertEqual((6, 3, 3, 3), variance2.get_shape())
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

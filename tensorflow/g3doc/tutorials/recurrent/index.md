@@ -2,7 +2,8 @@
 
 ## Introduction
 
-Take a look at [this great article](http://colah.github.io/posts/2015-08-Understanding-LSTMs/)
+Take a look at [this great article]
+(http://colah.github.io/posts/2015-08-Understanding-LSTMs/)
 for an introduction to recurrent neural networks and LSTMs in particular.
 
 ## Language Modeling
@@ -17,10 +18,10 @@ models, whilst being small and relatively fast to train.
 
 Language modeling is key to many interesting problems such as speech
 recognition, machine translation, or image captioning. It is also fun, too --
-take a look [here](http://karpathy.github.io/2015/05/21/rnn-effectiveness/).
+take a look [here] (http://karpathy.github.io/2015/05/21/rnn-effectiveness/).
 
 For the purpose of this tutorial, we will reproduce the results from
-[Zaremba et al., 2014](http://arxiv.org/abs/1409.2329)
+[Zaremba et al., 2014] (http://arxiv.org/abs/1409.2329)
 ([pdf](http://arxiv.org/pdf/1409.2329.pdf)), which achieves very good results
 on the PTB dataset.
 
@@ -60,7 +61,7 @@ The basic pseudocode looks as follows:
 lstm = rnn_cell.BasicLSTMCell(lstm_size)
 # Initial state of the LSTM memory.
 state = tf.zeros([batch_size, lstm.state_size])
-probabilities = []
+
 loss = 0.0
 for current_batch_of_words in words_in_dataset:
     # The value of state is updated after processing each batch of words.
@@ -68,7 +69,7 @@ for current_batch_of_words in words_in_dataset:
 
     # The LSTM output can be used to make next word predictions
     logits = tf.matmul(output, softmax_w) + softmax_b
-    probabilities.append(tf.nn.softmax(logits))
+    probabilities = tf.nn.softmax(logits)
     loss += loss_function(probabilities, target_words)
 ```
 

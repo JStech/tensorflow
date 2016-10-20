@@ -87,12 +87,13 @@ Returns a list of integers or `None` for each dimension.
 
 ##### Returns:
 
-  A list of integers or `None` for each dimension.
+  `None` if shape is unknown; otherwise, a list of integers or `None` for
+  each dimension.
 
 ##### Raises:
 
 
-*  <b>`ValueError`</b>: If `self` is an unknown shape with an unknown rank.
+*  <b>`ValueError`</b>: if `self` is completely unknown.
 
 
 - - -
@@ -296,45 +297,6 @@ Raises an exception if `self` is not fully defined in every dimension.
 #### Other Methods
 - - -
 
-#### `tf.TensorShape.__bool__()` {#TensorShape.__bool__}
-
-Returns True if this shape contains non-zero information.
-
-
-- - -
-
-#### `tf.TensorShape.__eq__(other)` {#TensorShape.__eq__}
-
-Returns True if `self` is equivalent to `other`.
-
-
-- - -
-
-#### `tf.TensorShape.__getitem__(key)` {#TensorShape.__getitem__}
-
-Returns the value of a dimension or a shape, depending on the key.
-
-##### Args:
-
-
-*  <b>`key`</b>: If `key` is an integer, returns the dimension at that index;
-    otherwise if `key` is a slice, returns a TensorShape whose
-    dimensions are those selected by the slice from `self`.
-
-##### Returns:
-
-  A dimension if `key` is an integer, or a `TensorShape` if `key` is a
-  slice.
-
-##### Raises:
-
-
-*  <b>`ValueError`</b>: If `key` is a slice, and any of its elements are negative, or
-    if `self` is completely unknown and the step is set.
-
-
-- - -
-
 #### `tf.TensorShape.__init__(dims)` {#TensorShape.__init__}
 
 Creates a new TensorShape with the given dimensions.
@@ -349,48 +311,6 @@ Creates a new TensorShape with the given dimensions.
 
 
 *  <b>`TypeError`</b>: If dims cannot be converted to a list of dimensions.
-
-
-- - -
-
-#### `tf.TensorShape.__iter__()` {#TensorShape.__iter__}
-
-Returns `self.dims` if the rank is known, otherwise raises ValueError.
-
-
-- - -
-
-#### `tf.TensorShape.__len__()` {#TensorShape.__len__}
-
-Returns the rank of this shape, or raises ValueError if unspecified.
-
-
-- - -
-
-#### `tf.TensorShape.__ne__(other)` {#TensorShape.__ne__}
-
-Returns True if `self` is known to be different from `other`.
-
-
-- - -
-
-#### `tf.TensorShape.__nonzero__()` {#TensorShape.__nonzero__}
-
-Returns True if this shape contains non-zero information.
-
-
-- - -
-
-#### `tf.TensorShape.__repr__()` {#TensorShape.__repr__}
-
-
-
-
-- - -
-
-#### `tf.TensorShape.__str__()` {#TensorShape.__str__}
-
-
 
 
 - - -

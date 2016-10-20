@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/arena.h"
 
 #include <assert.h>
+#include <unistd.h>
 
 #include <vector>
 

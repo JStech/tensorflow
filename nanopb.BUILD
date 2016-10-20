@@ -1,21 +1,19 @@
-# Description:
-#   Nanopb, a tiny ANSI C protobuf implementation for use on embedded devices.
+SOURCES = [
+    "pb_common.c",
+    "pb_decode.c",
+    "pb_encode.c",
+]
 
-licenses(["notice"])  # zlib license
+HEADERS = [
+    "pb.h",
+    "pb_common.h",
+    "pb_decode.h",
+    "pb_encode.h",
+]
 
 cc_library(
     name = "nanopb",
-    srcs = [
-        "pb_common.c",
-        "pb_decode.c",
-        "pb_encode.c",
-    ],
-    hdrs = [
-        "pb.h",
-        "pb_common.h",
-        "pb_decode.h",
-        "pb_encode.h",
-    ],
-    includes = ["."],
+    srcs = SOURCES,
+    hdrs = HEADERS,
     visibility = ["//visibility:public"],
 )

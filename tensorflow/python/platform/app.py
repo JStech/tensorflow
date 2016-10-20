@@ -25,6 +25,6 @@ from tensorflow.python.platform import flags
 
 def run(main=None):
   f = flags.FLAGS
-  flags_passthrough = f._parse_flags()
+  f._parse_flags()
   main = main or sys.modules['__main__'].main
-  sys.exit(main(sys.argv[:1] + flags_passthrough))
+  sys.exit(main(sys.argv))

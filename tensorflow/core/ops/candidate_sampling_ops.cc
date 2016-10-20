@@ -18,9 +18,9 @@ limitations under the License.
 
 namespace tensorflow {
 
-using shape_inference::DimensionHandle;
+using shape_inference::Dimension;
 using shape_inference::InferenceContext;
-using shape_inference::ShapeHandle;
+using shape_inference::Shape;
 
 namespace {
 
@@ -30,11 +30,11 @@ Status CandidateSamplerShapeFn(InferenceContext* c) {
   int64 num_true;
   TF_RETURN_IF_ERROR(c->GetAttr("num_true", &num_true));
 
-  ShapeHandle true_classes_shape;
+  const Shape* true_classes_shape;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 2, &true_classes_shape));
-  DimensionHandle batch_size = c->Dim(true_classes_shape, 0);
+  const Dimension* batch_size = c->Dim(true_classes_shape, 0);
 
-  ShapeHandle num_sampled_v = c->Vector(num_sampled);
+  const Shape* num_sampled_v = c->Vector(num_sampled);
   c->set_output(0, num_sampled_v);
   c->set_output(1, c->Matrix(batch_size, num_true));
   c->set_output(2, num_sampled_v);
@@ -378,14 +378,14 @@ REGISTER_OP("ComputeAccidentalHits")
       TF_RETURN_IF_ERROR(c->GetAttr("num_true", &num_true));
 
       // Validate true_classes.
-      ShapeHandle true_classes;
+      const Shape* true_classes;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 2, &true_classes));
-      DimensionHandle unused;
+      const Dimension* unused;
       TF_RETURN_IF_ERROR(
           c->WithValue(c->Dim(true_classes, 1), num_true, &unused));
 
       // All three outputs are the same shape.
-      ShapeHandle v = c->Vector(InferenceContext::kUnknownDim);
+      const Shape* v = c->Vector(InferenceContext::kUnknownDim);
       c->set_output(0, v);
       c->set_output(1, v);
       c->set_output(2, v);

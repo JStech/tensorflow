@@ -72,7 +72,7 @@ protocol buffer file in the call to `save()`.
 
 - - -
 
-#### `tf.train.Saver.__init__(var_list=None, reshape=False, sharded=False, max_to_keep=5, keep_checkpoint_every_n_hours=10000.0, name=None, restore_sequentially=False, saver_def=None, builder=None, defer_build=False, allow_empty=False, write_version=1, pad_step_number=False)` {#Saver.__init__}
+#### `tf.train.Saver.__init__(var_list=None, reshape=False, sharded=False, max_to_keep=5, keep_checkpoint_every_n_hours=10000.0, name=None, restore_sequentially=False, saver_def=None, builder=None, defer_build=False)` {#Saver.__init__}
 
 Creates a `Saver`.
 
@@ -137,17 +137,6 @@ checkpoints per device.
 *  <b>`defer_build`</b>: If `True`, defer adding the save and restore ops to the
     `build()` call. In that case `build()` should be called before
     finalizing the graph or using the saver.
-*  <b>`allow_empty`</b>: If `False` (default) raise an error if there are no
-    variables in the graph. Otherwise, construct the saver anyway and make
-    it a no-op.
-*  <b>`write_version`</b>: controls what format to use when saving checkpoints.  It
-    also affects certain filepath matching logic.  Defaults to V1
-    currently, and will be switched to the more memory-efficient V2 format
-    in the future.  If set to V2, the Saver is still able to restore from
-    old V1 checkpoints.
-*  <b>`pad_step_number`</b>: if True, pads the global step number in the checkpoint
-    filepaths to some fixed width (8 by default).  This is turned off by
-    default.
 
 ##### Raises:
 
@@ -192,7 +181,6 @@ path can be passed directly to a call to `restore()`.
   A string: path at which the variables were saved.  If the saver is
     sharded, this string ends with: '-?????-of-nnnnn' where 'nnnnn'
     is the number of shards created.
-  If the saver is empty, returns None.
 
 ##### Raises:
 
@@ -226,8 +214,7 @@ The `save_path` argument is typically a value previously returned from a
 ##### Raises:
 
 
-*  <b>`ValueError`</b>: DEPRECATED, do not rely on this Error.  If the given
-    `save_path` does not point to a file.
+*  <b>`ValueError`</b>: If the given `save_path` does not point to a file.
 
 
 

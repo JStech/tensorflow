@@ -62,7 +62,7 @@ def sparse_boolean_mask(sparse_tensor, mask, name="sparse_boolean_mask"):
 
 
 @series.Series.register_binary_op("select_rows")
-class BooleanMask(transform.TensorFlowTransform):
+class BooleanMask(transform.Transform):
   """Apply a boolean mask to a `Series`."""
 
   @property

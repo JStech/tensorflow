@@ -9,8 +9,6 @@ load("//tensorflow:tensorflow.bzl", "tf_copts")
 
 exports_files(["LICENSE"])
 
-LINKER_SCRIPT = "//tensorflow/contrib/android:jni/version_script.lds"
-
 cc_binary(
     name = "libtensorflow_demo.so",
     srcs = glob([
@@ -26,8 +24,7 @@ cc_binary(
         "-z defs",
         "-s",
         "-Wl,--icf=all",  # Identical Code Folding
-        "-Wl,--version-script",  # This line must be directly followed by LINKER_SCRIPT.
-        LINKER_SCRIPT,
+        "-Wl,--exclude-libs,ALL",  # Exclude syms in all libs from auto export
     ],
     linkshared = 1,
     linkstatic = 1,
@@ -35,11 +32,7 @@ cc_binary(
         "manual",
         "notap",
     ],
-    deps = [
-        "//tensorflow/contrib/android:android_tensorflow_inference_jni",
-        "//tensorflow/core:android_tensorflow_lib",
-        LINKER_SCRIPT,
-    ],
+    deps = ["//tensorflow/core:android_tensorflow_lib"],
 )
 
 cc_library(
@@ -55,9 +48,7 @@ android_binary(
     name = "tensorflow_demo",
     srcs = glob([
         "src/**/*.java",
-    ]) + [
-        "//tensorflow/contrib/android:android_tensorflow_inference_java_srcs",
-    ],
+    ]),
     assets = glob(["assets/**"]),
     assets_dir = "assets",
     custom_package = "org.tensorflow.demo",
@@ -82,8 +73,6 @@ filegroup(
             "**/OWNERS",
             "bin/**",
             "gen/**",
-            "gradleBuild/**",
-            "libs/**",
         ],
     ),
     visibility = ["//tensorflow:__subpackages__"],

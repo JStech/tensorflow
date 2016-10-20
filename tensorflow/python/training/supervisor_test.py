@@ -26,9 +26,6 @@ import uuid
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-from tensorflow.core.protobuf import meta_graph_pb2
-from tensorflow.python.framework import meta_graph
-
 
 def _summary_iterator(test_dir):
   """Reads events from test_dir/events.
@@ -52,22 +49,17 @@ def _test_dir(test_name):
 
 class SupervisorTest(tf.test.TestCase):
 
-  def _wait_for_glob(self, pattern, timeout_secs, for_checkpoint=True):
+  def _wait_for_glob(self, pattern, timeout_secs):
     """Wait for a checkpoint file to appear.
 
     Args:
       pattern: A string.
       timeout_secs: How long to wait for in seconds.
-      for_checkpoint: whether we're globbing for checkpoints.
     """
     end_time = time.time() + timeout_secs
     while time.time() < end_time:
-      if for_checkpoint:
-        if tf.train.checkpoint_exists(pattern):
-          return
-      else:
-        if len(tf.gfile.Glob(pattern)) >= 1:
-          return
+      if len(tf.gfile.Glob(pattern)) >= 1:
+        return
       time.sleep(0.05)
     self.assertFalse(True, "Glob never matched any file: %s" % pattern)
 
@@ -155,12 +147,9 @@ class SupervisorTest(tf.test.TestCase):
       ev = next(rr)
       self.assertEquals("brain.Event:2", ev.file_version)
 
-      # The next one has the graph and metagraph.
+      # The next one has the graph.
       ev = next(rr)
       self.assertTrue(ev.graph_def)
-
-      ev = next(rr)
-      self.assertTrue(ev.meta_graph_def)
 
       # The next one should have the values from the summary.
       # But only once.
@@ -202,9 +191,6 @@ class SupervisorTest(tf.test.TestCase):
     # The next one has the graph.
     ev = next(rr)
     self.assertTrue(ev.graph_def)
-
-    ev = next(rr)
-    self.assertTrue(ev.meta_graph_def)
 
     # The next one should have the values from the summary.
     ev = next(rr)
@@ -313,7 +299,6 @@ class SupervisorTest(tf.test.TestCase):
     with tf.Graph().as_default():
       summ = tf.scalar_summary(["c1", "c2", "c3"], tf.constant([1.0, 2.0, 3.0]))
       sv = tf.train.Supervisor(is_chief=True, logdir=logdir, summary_op=None)
-      meta_graph_def = meta_graph.create_meta_graph_def()
       sess = sv.prepare_or_wait_for_session("")
       sv.summary_computed(sess, sess.run(summ))
       sess.close()
@@ -333,13 +318,6 @@ class SupervisorTest(tf.test.TestCase):
     ev_graph.ParseFromString(ev.graph_def)
     self.assertProtoEquals(sess.graph.as_graph_def(add_shapes=True), ev_graph)
 
-    # Stored MetaGraphDef
-    ev = next(rr)
-    ev_meta_graph = meta_graph_pb2.MetaGraphDef()
-    ev_meta_graph.ParseFromString(ev.meta_graph_def)
-    self.assertProtoEquals(meta_graph_def, ev_meta_graph)
-    self.assertProtoEquals(
-        sess.graph.as_graph_def(add_shapes=True), ev_meta_graph.graph_def)
     # The next one should have the values from the summary.
     ev = next(rr)
     self.assertProtoEquals("""
@@ -403,7 +381,6 @@ class SupervisorTest(tf.test.TestCase):
       summ = tf.scalar_summary(["c1", "c2", "c3"], const)
       sw = tf.train.SummaryWriter(logdir)
       sv = tf.train.Supervisor(logdir="", summary_op=None, summary_writer=sw)
-      meta_graph_def = meta_graph.create_meta_graph_def()
       sess = sv.prepare_or_wait_for_session("")
       sv.summary_computed(sess, sess.run(summ))
       sess.close()
@@ -423,14 +400,6 @@ class SupervisorTest(tf.test.TestCase):
     ev_graph = tf.GraphDef()
     ev_graph.ParseFromString(ev.graph_def)
     self.assertProtoEquals(sess.graph.as_graph_def(add_shapes=True), ev_graph)
-
-    # Stored MetaGraphDef
-    ev = next(rr)
-    ev_meta_graph = meta_graph_pb2.MetaGraphDef()
-    ev_meta_graph.ParseFromString(ev.meta_graph_def)
-    self.assertProtoEquals(meta_graph_def, ev_meta_graph)
-    self.assertProtoEquals(
-        sess.graph.as_graph_def(add_shapes=True), ev_meta_graph.graph_def)
 
     # The next one should have the values from the summary.
     ev = next(rr)
@@ -552,8 +521,7 @@ class SupervisorTest(tf.test.TestCase):
       sv.prepare_or_wait_for_session(server.target)
       save_path = sv.save_path
       self._wait_for_glob(save_path, 3.0)
-      self._wait_for_glob(
-          os.path.join(logdir, "*events*"), 3.0, for_checkpoint=False)
+      self._wait_for_glob(os.path.join(logdir, "*events*"), 3.0)
       # Wait to make sure everything is written to file before stopping.
       time.sleep(1)
       sv.stop()
@@ -709,13 +677,10 @@ class SupervisorTest(tf.test.TestCase):
       v = tf.Variable([1.0], name="foo")
       tf.scalar_summary(["v"], v)
       sv = tf.train.Supervisor(logdir=logdir)
-      meta_graph_def = meta_graph.create_meta_graph_def(
-          saver_def=sv.saver.saver_def)
       sess = sv.prepare_or_wait_for_session("")
       save_path = sv.save_path
       self._wait_for_glob(save_path, 3.0)
-      self._wait_for_glob(
-          os.path.join(logdir, "*events*"), 3.0, for_checkpoint=False)
+      self._wait_for_glob(os.path.join(logdir, "*events*"), 3.0)
       # Wait to make sure everything is written to file before stopping.
       time.sleep(1)
       sv.stop()
@@ -727,18 +692,8 @@ class SupervisorTest(tf.test.TestCase):
     ev_graph = tf.GraphDef()
     ev_graph.ParseFromString(ev.graph_def)
     self.assertProtoEquals(sess.graph.as_graph_def(add_shapes=True), ev_graph)
-
-    # Stored MetaGraphDef
-    ev = next(rr)
-    ev_meta_graph = meta_graph_pb2.MetaGraphDef()
-    ev_meta_graph.ParseFromString(ev.meta_graph_def)
-    self.assertProtoEquals(meta_graph_def, ev_meta_graph)
-    self.assertProtoEquals(
-        sess.graph.as_graph_def(add_shapes=True), ev_meta_graph.graph_def)
-
     ev = next(rr)
     self.assertProtoEquals("value { tag: 'v' simple_value: 1.0 }", ev.summary)
-
     ev = next(rr)
     self.assertEquals(tf.SessionLog.STOP, ev.session_log.status)
 
@@ -758,14 +713,11 @@ class SupervisorTest(tf.test.TestCase):
     with tf.Graph().as_default():
       v = tf.Variable([123], name="global_step")
       sv = tf.train.Supervisor(logdir=logdir)
-      meta_graph_def = meta_graph.create_meta_graph_def(
-          saver_def=sv.saver.saver_def)
       sess = sv.prepare_or_wait_for_session("")
       # This is where the checkpoint will appear, with step number 123.
       save_path = "%s-123" % sv.save_path
       self._wait_for_glob(save_path, 3.0)
-      self._wait_for_glob(
-          os.path.join(logdir, "*events*"), 3.0, for_checkpoint=False)
+      self._wait_for_glob(os.path.join(logdir, "*events*"), 3.0)
       # Wait to make sure everything is written to file before stopping.
       time.sleep(1)
       sv.stop()
@@ -777,12 +729,6 @@ class SupervisorTest(tf.test.TestCase):
     ev_graph = tf.GraphDef()
     ev_graph.ParseFromString(ev.graph_def)
     self.assertProtoEquals(sess.graph.as_graph_def(add_shapes=True), ev_graph)
-    ev = next(rr)
-    ev_meta_graph = meta_graph_pb2.MetaGraphDef()
-    ev_meta_graph.ParseFromString(ev.meta_graph_def)
-    self.assertProtoEquals(meta_graph_def, ev_meta_graph)
-    self.assertProtoEquals(
-        sess.graph.as_graph_def(add_shapes=True), ev_meta_graph.graph_def)
     ev = next(rr)
     # It is actually undeterministic whether SessionLog.START gets written
     # before the summary or the checkpoint, but this works when run 10000 times.

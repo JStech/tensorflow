@@ -7,7 +7,6 @@ exports_files(["LICENSE"])
 
 package(default_visibility = ["//tensorflow:__subpackages__"])
 
-load("//tensorflow:tensorflow.bzl", "cuda_py_test")
 load("//tensorflow:tensorflow.bzl", "tf_custom_op_library")
 load("//tensorflow:tensorflow.bzl", "tf_gen_op_libs")
 load("//tensorflow:tensorflow.bzl", "tf_gen_op_wrapper_py")
@@ -85,11 +84,12 @@ py_library(
     ],
 )
 
-cuda_py_test(
+py_test(
     name = "layers_test",
     size = "small",
     srcs = ["python/layers/layers_test.py"],
-    additional_deps = [
+    srcs_version = "PY2AND3",
+    deps = [
         ":layers_py",
         "//tensorflow:tensorflow_py",
         "//tensorflow/python:framework_test_lib",

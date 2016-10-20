@@ -22,7 +22,7 @@ py_test(
         "convolutional.py",
     ],
     args = [
-        "--self_test",
+        "--self_test=True",
     ],
     main = "convolutional.py",
     srcs_version = "PY2AND3",

@@ -1,7 +1,7 @@
 Estimator class is the basic TensorFlow model trainer/evaluator.
 - - -
 
-#### `tf.contrib.learn.Estimator.__init__(model_fn=None, model_dir=None, config=None, params=None, feature_engineering_fn=None)` {#Estimator.__init__}
+#### `tf.contrib.learn.Estimator.__init__(model_fn=None, model_dir=None, config=None, params=None)` {#Estimator.__init__}
 
 Constructs an Estimator instance.
 
@@ -9,21 +9,14 @@ Constructs an Estimator instance.
 
 
 *  <b>`model_fn`</b>: Model function, takes features and targets tensors or dicts of
-            tensors and returns tuple of:
-
-      * predictions: `Tensor`, `SparseTensor` or dictionary of same.
-          Can also be any type that is convertible to a `Tensor` or
-          `SparseTensor`, or dictionary of same.
-      * loss: Scalar loss `Tensor`.
-      * train_op: Training update `Tensor` or `Operation`.
-
-     Supports next three signatures for the function:
+            tensors and returns predictions and loss tensors.
+            Supports next three signatures for the function:
 
       * `(features, targets) -> (predictions, loss, train_op)`
       * `(features, targets, mode) -> (predictions, loss, train_op)`
       * `(features, targets, mode, params) -> (predictions, loss, train_op)`
 
-    Where
+  Where
 
       * `features` are single `Tensor` or `dict` of `Tensor`s
              (depending on data passed to `fit`),
@@ -45,30 +38,11 @@ Constructs an Estimator instance.
 *  <b>`config`</b>: Configuration object.
 *  <b>`params`</b>: `dict` of hyper parameters that will be passed into `model_fn`.
           Keys are names of parameters, values are basic python types.
-*  <b>`feature_engineering_fn`</b>: Feature engineering function. Takes features and
-                          targets which are the output of `input_fn` and
-                          returns features and targets which will be fed
-                          into `model_fn`. Please check `model_fn` for
-                          a definition of features and targets.
 
 ##### Raises:
 
 
 *  <b>`ValueError`</b>: parameters of `model_fn` don't match `params`.
-
-
-- - -
-
-#### `tf.contrib.learn.Estimator.__repr__()` {#Estimator.__repr__}
-
-
-
-
-- - -
-
-#### `tf.contrib.learn.Estimator.config` {#Estimator.config}
-
-
 
 
 - - -
@@ -87,44 +61,22 @@ See `Evaluable`.
 
 - - -
 
-#### `tf.contrib.learn.Estimator.export(*args, **kwargs)` {#Estimator.export}
+#### `tf.contrib.learn.Estimator.export(export_dir, signature_fn=None, input_fn=default_input_fn, default_batch_size=1, exports_to_keep=None)` {#Estimator.export}
 
-Exports inference graph into given dir. (deprecated arguments)
+Exports inference graph into given dir.
 
-SOME ARGUMENTS ARE DEPRECATED. They will be removed after 2016-09-23.
-Instructions for updating:
-The signature of the input_fn accepted by export is changing to be consistent with what's used by tf.Learn Estimator's train/evaluate. input_fn (and in most cases, input_feature_key) will become required args, and use_deprecated_input_fn will default to False and be removed altogether.
+##### Args:
 
-    Args:
-      export_dir: A string containing a directory to write the exported graph
-        and checkpoints.
-      input_fn: If `use_deprecated_input_fn` is true, then a function that given
-        `Tensor` of `Example` strings, parses it into features that are then
-        passed to the model. Otherwise, a function that takes no argument and
-        returns a tuple of (features, targets), where features is a dict of
-        string key to `Tensor` and targets is a `Tensor` that's currently not
-        used (and so can be `None`).
-      input_feature_key: Only used if `use_deprecated_input_fn` is false. String
-        key into the features dict returned by `input_fn` that corresponds to a
-        the raw `Example` strings `Tensor` that the exported model will take as
-        input. Can only be `None` if you're using a custom `signature_fn` that
-        does not use the first arg (examples).
-      use_deprecated_input_fn: Determines the signature format of `input_fn`.
-      signature_fn: Function that returns a default signature and a named
-        signature map, given `Tensor` of `Example` strings, `dict` of `Tensor`s
-        for features and `Tensor` or `dict` of `Tensor`s for predictions.
-      prediction_key: The key for a tensor in the `predictions` dict (output
-        from the `model_fn`) to use as the `predictions` input to the
-        `signature_fn`. Optional. If `None`, predictions will pass to
-        `signature_fn` without filtering.
-      default_batch_size: Default batch size of the `Example` placeholder.
-      exports_to_keep: Number of exports to keep.
 
-    Returns:
-      The string path to the exported directory. NB: this functionality was
-      added ca. 2016/09/25; clients that depend on the return value may need
-      to handle the case where this function returns None because subclasses
-      are not returning a value.
+*  <b>`export_dir`</b>: A string containing a directory to write the exported graph
+    and checkpoints.
+*  <b>`signature_fn`</b>: Function that returns a default signature and a named
+    signature map, given `Tensor` of `Example` strings, `dict` of `Tensor`s
+    for features and `Tensor` or `dict` of `Tensor`s for predictions.
+*  <b>`input_fn`</b>: Function that given `Tensor` of `Example` strings, parses it
+    into features that are then passed to the model.
+*  <b>`default_batch_size`</b>: Default batch size of the `Example` placeholder.
+*  <b>`exports_to_keep`</b>: Number of exports to keep.
 
 
 - - -

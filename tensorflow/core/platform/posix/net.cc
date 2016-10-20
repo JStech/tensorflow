@@ -15,7 +15,6 @@ limitations under the License.
 
 #include "tensorflow/core/platform/net.h"
 
-#include <cerrno>
 #include <cstdlib>
 #include <unordered_set>
 

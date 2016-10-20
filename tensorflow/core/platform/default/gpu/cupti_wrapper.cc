@@ -17,9 +17,9 @@ limitations under the License.
 
 #if GOOGLE_CUDA
 
+#include <dlfcn.h>
 #include <string>
 
-#include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/stream_executor.h"
 
 namespace perftools {
@@ -38,10 +38,9 @@ namespace dynload {
       return status.ValueOrDie();                                           \
     }                                                                       \
     static FuncPointerT DynLoad() {                                         \
-      static void* f;                                                       \
-      TF_CHECK_OK(::tensorflow::Env::Default()->GetSymbolFromLibrary(       \
-          GetDsoHandle(), kName, &f))                                       \
-          << "could not find " << kName << "in libcupti DSO";               \
+      static void* f = dlsym(GetDsoHandle(), kName);                        \
+      CHECK(f != nullptr) << "could not find " << kName                     \
+                          << "in libcupti DSO; dlerror: " << dlerror();     \
       return reinterpret_cast<FuncPointerT>(f);                             \
     }                                                                       \
     template <typename... Args>                                             \

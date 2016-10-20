@@ -110,7 +110,7 @@ class MockSeries(learn.Series):
     return self._cachekey
 
 
-class MockTransform(learn.TensorFlowTransform):
+class MockTransform(learn.Transform):
   """A mock transform for use in testing."""
 
   __metaclass__ = ABCMeta

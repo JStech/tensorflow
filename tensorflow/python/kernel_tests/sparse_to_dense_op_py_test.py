@@ -86,7 +86,8 @@ class SparseToDenseTest(tf.test.TestCase):
 
   def testBadShape(self):
     with self.test_session():
-      with self.assertRaisesWithPredicateMatch(ValueError, "must be rank 1"):
+      with self.assertRaisesWithPredicateMatch(
+          ValueError, lambda e: ("Input shape should be a vector" == str(e))):
         _SparseToDense([1, 3], [[5], [3]], 1, -1)
 
   def testBadValue(self):

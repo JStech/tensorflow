@@ -86,20 +86,6 @@ The `Operation` that produces `values` as an output.
 #### Other Methods
 - - -
 
-#### `tf.IndexedSlices.__neg__()` {#IndexedSlices.__neg__}
-
-
-
-
-- - -
-
-#### `tf.IndexedSlices.__str__()` {#IndexedSlices.__str__}
-
-
-
-
-- - -
-
 #### `tf.IndexedSlices.graph` {#IndexedSlices.graph}
 
 The `Graph` that contains the values, indices, and shape tensors.

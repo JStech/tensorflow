@@ -19,7 +19,6 @@ limitations under the License.
 #include <limits.h>
 #include <vector>
 
-#include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/resource_mgr.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -183,13 +182,10 @@ class TensorArray : public ResourceBase {
 
   template <typename Device, typename T>
   Status WriteOrAggregateMany(OpKernelContext* ctx,
-                              const std::vector<int32>& indices,
                               std::vector<PersistentTensor>* values) {
     mutex_lock l(mu_);
-    int32 i = 0;
-    for (const int32 ix : indices) {
-      Status s = LockedWriteOrAggregate<Device, T>(ctx, ix, &(*values)[i]);
-      ++i;
+    for (int32 i = values->size() - 1; i >= 0; --i) {
+      Status s = LockedWriteOrAggregate<Device, T>(ctx, i, &(*values)[i]);
       TF_RETURN_IF_ERROR(s);
     }
     return Status::OK();
@@ -218,15 +214,13 @@ class TensorArray : public ResourceBase {
   }
 
   template <typename Device, typename T>
-  Status ReadMany(OpKernelContext* ctx, const std::vector<int32>& indices,
-                  std::vector<PersistentTensor>* values) {
+  Status ReadMany(OpKernelContext* ctx, std::vector<PersistentTensor>* values,
+                  int32 size) {
     mutex_lock l(mu_);
     values->clear();
-    values->resize(indices.size());
-    int32 i = 0;
-    for (const int32 ix : indices) {
-      Status s = LockedRead<Device, T>(ctx, ix, &(*values)[i]);
-      ++i;
+    values->resize(size);
+    for (std::size_t i = 0; i < size; ++i) {
+      Status s = LockedRead<Device, T>(ctx, i, &(*values)[i]);
       if (!s.ok()) return s;
     }
     return Status::OK();

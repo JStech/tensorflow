@@ -49,4 +49,4 @@ def bucketize(input_tensor, boundaries, name=None):
   return _bucketization_op.bucketize(input_tensor, boundaries, name=name)
 
 
-ops.NotDifferentiable("Bucketize")
+ops.NoGradient("Bucketize")

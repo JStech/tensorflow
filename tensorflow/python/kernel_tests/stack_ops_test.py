@@ -22,7 +22,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.framework import errors
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import gen_data_flow_ops
 
 
@@ -76,8 +75,7 @@ class StackOpTest(tf.test.TestCase):
         nx = tf.sub(x, 1)
         ny = y + gen_data_flow_ops._stack_pop(h, tf.float32)
         return [nx, ny]
-      rx, ry = tf.while_loop(c1, b1, [r, v],
-                             [r.get_shape(), tensor_shape.unknown_shape()])
+      rx, ry = tf.while_loop(c1, b1, [r, v])
       self.assertAllClose(np.ones(2000) * 10.0, ry.eval())
 
   def testStackWhileSwap(self):
@@ -101,18 +99,19 @@ class StackOpTest(tf.test.TestCase):
     self._testMultiStack(use_gpu=False)
     self._testMultiStack(use_gpu=True)
 
-  def _testSameNameStacks(self, use_gpu):
+  def _testDuplicateStack(self, use_gpu):
     with self.test_session(use_gpu=use_gpu):
       h1 = gen_data_flow_ops._stack(tf.float32, stack_name="foo")
       c1 = gen_data_flow_ops._stack_push(h1, 4.0)
       h2 = gen_data_flow_ops._stack(tf.float32, stack_name="foo")
       c2 = gen_data_flow_ops._stack_push(h2, 5.0)
       r = c1 + c2
-      self.assertNotEqual(h1.eval()[1], h2.eval()[1])
+      with self.assertRaises(errors.AlreadyExistsError):
+        r.eval()
 
-  def testSameNameStacks(self):
-    self._testSameNameStacks(use_gpu=False)
-    self._testSameNameStacks(use_gpu=True)
+  def testDuplicateStack(self):
+    self._testDuplicateStack(use_gpu=False)
+    self._testDuplicateStack(use_gpu=True)
 
   def _testCloseStack(self, use_gpu):
     with self.test_session(use_gpu=use_gpu) as sess:

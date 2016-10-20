@@ -37,16 +37,15 @@ function parseValue(value: string): string|number|boolean {
 /**
  * Fetches a text file and returns a promise of the result.
  */
-export function fetchPbTxt(filepath: string): Promise<ArrayBuffer> {
-  return new Promise<ArrayBuffer>(function(resolve, reject) {
-    const request = new XMLHttpRequest();
-    request.open('GET', filepath);
-    request.responseType = 'arraybuffer';
-
-    request.onerror = () => reject(request.status);
-    request.onload = () => resolve(request.response);
-
-    request.send(null);
+export function fetchPbTxt(filepath: string): Promise<string> {
+  return new Promise<string>(function(resolve, reject) {
+    d3.text(filepath, function(error, text) {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(text);
+    });
   });
 }
 
@@ -61,21 +60,18 @@ export function fetchAndParseMetadata(path: string, tracker: ProgressTracker) {
             if (path == null) {
               return Promise.resolve(null);
             }
-            return fetchPbTxt(path);
+            return fetchPbTxt(path).then(text => new Blob([text]));
           },
           tracker)
-      .then((arrayBuffer: ArrayBuffer) => {
-        return tf.graph.util.runAsyncPromiseTask(
-            'Parsing metadata.pbtxt', 60, () => {
-              return arrayBuffer != null ? parseStatsPbTxt(arrayBuffer) :
-                                           Promise.resolve(null);
-            }, tracker);
+      .then((blob: Blob) => {
+        return tf.graph.util.runTask('Parsing metadata.pbtxt', 60, () => {
+          return blob != null ? parseStatsPbTxt(blob) : null;
+        }, tracker);
       });
 }
 
 /**
- * Fetches the graph file, parses it and returns a promise of the result. The
- * result will be undefined if the graph is empty.
+ * Fetches the graph file, parses it and returns a promise of the result.
  */
 export function fetchAndParseGraphData(path: string, pbTxtFile: Blob,
     tracker: ProgressTracker) {
@@ -83,21 +79,13 @@ export function fetchAndParseGraphData(path: string, pbTxtFile: Blob,
       .runTask(
           'Reading graph pbtxt', 40,
           () => {
-            if (pbTxtFile) {
-              return new Promise<ArrayBuffer>(function(resolve, reject) {
-                let fileReader = new FileReader();
-                fileReader.onload = () => resolve(fileReader.result);
-                fileReader.onerror = () => reject(fileReader.error);
-                fileReader.readAsArrayBuffer(pbTxtFile);
-              });
-            } else {
-              return fetchPbTxt(path);
-            }
+            return pbTxtFile ? Promise.resolve(pbTxtFile) :
+                               fetchPbTxt(path).then(text => new Blob([text]));
           },
           tracker)
-      .then((arrayBuffer: ArrayBuffer) => {
+      .then(blob => {
         return tf.graph.util.runTask('Parsing graph.pbtxt', 60, () => {
-          return parseGraphPbTxt(arrayBuffer);
+          return parseGraphPbTxt(blob);
         }, tracker);
       });
 }
@@ -105,35 +93,42 @@ export function fetchAndParseGraphData(path: string, pbTxtFile: Blob,
 /**
  * Parse a file object in a streaming fashion line by line (or custom delim).
  * Can handle very large files.
- * @param input The file object as an array buffer.
+ * @param input The file object
  * @param callback The callback called on each line
  * @param chunkSize The size of each read chunk. (optional)
  * @param delim The delimiter used to split a line. (optional)
  * @returns A promise for when it is finished.
  */
 export function streamParse(
-    arrayBuffer: ArrayBuffer, callback: (string) => void,
-    chunkSize: number = 1000000, delim: string = '\n'): Promise<boolean> {
+    file: Blob, callback: (string) => void, chunkSize: number = 1000000,
+    delim: string = '\n'): Promise<boolean> {
   return new Promise<boolean>(function(resolve, reject) {
     let offset = 0;
-    let bufferSize = arrayBuffer.byteLength - 1;
+    let fileSize = file.size - 1;
     let data = '';
 
-    function readHandler(str) {
-      offset += chunkSize;
-      let parts = str.split(delim);
-      let first = data + parts[0];
-      if (parts.length === 1) {
-        data = first;
-        readChunk(offset, chunkSize);
+    function readHandler(evt) {
+      if (evt.target.error == null) {
+        offset += evt.target.result.length;
+        let str = evt.target.result;
+        let parts = str.split(delim);
+        let first = data + parts[0];
+        if (parts.length === 1) {
+          data = first;
+          readChunk(offset, chunkSize);
+          return;
+        }
+        data = parts[parts.length - 1];
+        callback(first);
+        for (let i = 1; i < parts.length - 1; i++) {
+          callback(parts[i]);
+        }
+      } else {
+        // read error
+        reject(evt.target.error);
         return;
       }
-      data = parts[parts.length - 1];
-      callback(first);
-      for (let i = 1; i < parts.length - 1; i++) {
-        callback(parts[i]);
-      }
-      if (offset >= bufferSize) {
+      if (offset >= fileSize) {
         if (data) {
           callback(data);
         }
@@ -144,12 +139,10 @@ export function streamParse(
     }
 
     function readChunk(offset: number, size: number) {
-      const arrayBufferChunk = arrayBuffer.slice(offset, offset + size);
-
-      const blob = new Blob([arrayBufferChunk]);
-      const file = new FileReader();
-      file.onload = (e: any) => readHandler(e.target.result);
-      file.readAsText(blob);
+      var reader = new FileReader();
+      var blob = file.slice(offset, offset + size);
+      reader.onload = readHandler;
+      reader.readAsText(blob);
     }
 
     readChunk(offset, chunkSize);
@@ -185,32 +178,31 @@ const METADATA_REPEATED_FIELDS: {[attrPath: string]: boolean} = {
 };
 
 /**
- * Parses an ArrayBuffer of a proto txt file into a raw Graph object.
+ * Parses a blob of proto txt file into a raw Graph object.
  */
-export function parseGraphPbTxt(input: ArrayBuffer):
+export function parseGraphPbTxt(input: Blob):
     Promise<tf.graph.proto.NodeDef[]> {
   return parsePbtxtFile(input, GRAPH_REPEATED_FIELDS).then(obj => obj['node']);
 }
 
 /**
- * Parses an ArrayBuffer of a proto txt file into a StepStats object.
+ * Parses a blob of proto txt file into a StepStats object.
  */
-export function parseStatsPbTxt(input: ArrayBuffer):
+export function parseStatsPbTxt(input: Blob):
     Promise<tf.graph.proto.StepStats> {
   return parsePbtxtFile(input, METADATA_REPEATED_FIELDS)
       .then(obj => obj['step_stats']);
 }
 
 /**
- * Parses a ArrayBuffer of a proto txt file into javascript object.
+ * Parses a blob of proto txt file into javascript object.
  *
- * @param input The ArrayBuffer or file object implementing slice.
+ * @param input The Blob or file object implementing slice.
  * @param repeatedFields Map (Set) of all the repeated fields, since you can't
  *   tell directly from the pbtxt if a field is repeated or not.
  * @returns The parsed object.
  */
-function parsePbtxtFile(
-    input: ArrayBuffer,
+function parsePbtxtFile(input: Blob,
     repeatedFields: {[attrPath: string]: boolean}): Promise<Object> {
   let output: { [name: string]: any; } = {};
   let stack = [];

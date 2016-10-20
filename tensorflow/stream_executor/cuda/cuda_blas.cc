@@ -18,8 +18,8 @@ limitations under the License.
 // cuda.h). This ensures that Eigen's Half.h does not attempt to make its own
 // __half typedef if CUDA has already defined one (and conversely, that we do
 // not include <cuda_fp16.h> after Half.h has made its typedef).
-#include "cuda/include/cuda.h"
-#include "cuda/include/cublas_v2.h"
+#include "third_party/gpus/cuda/include/cuda.h"
+#include "third_party/gpus/cuda/include/cublas_v2.h"
 
 #if CUDA_VERSION >= 7050
 #define EIGEN_HAS_CUDA_FP16
@@ -33,6 +33,8 @@ limitations under the License.
 
 #include "tensorflow/stream_executor/cuda/cuda_blas.h"
 
+#include <dlfcn.h>
+
 #include <complex>
 
 #include "tensorflow/stream_executor/cuda/cuda_activation.h"
@@ -42,7 +44,6 @@ limitations under the License.
 #include "tensorflow/stream_executor/cuda/cuda_stream.h"
 #include "tensorflow/stream_executor/device_memory.h"
 #include "tensorflow/stream_executor/dso_loader.h"
-#include "tensorflow/stream_executor/lib/env.h"
 #include "tensorflow/stream_executor/lib/initialize.h"
 #include "tensorflow/stream_executor/lib/status.h"
 #include "tensorflow/stream_executor/lib/status_macros.h"
@@ -70,20 +71,14 @@ namespace dynload {
       static auto status = internal::CachedDsoLoader::GetCublasDsoHandle(); \
       return status.ValueOrDie();                                           \
     }                                                                       \
-    static FuncPointerT LoadOrDie() {                                       \
-      void *f;                                                              \
-      port::Status s = port::Env::Default()->GetSymbolFromLibrary(          \
-          GetDsoHandle(), kName, &f);                                       \
-      CHECK(s.ok()) << "could not find " << kName                           \
-                    << " in cuBLAS DSO; dlerror: " << s.error_message();    \
+    static FuncPointerT DynLoad() {                                         \
+      static void *f = dlsym(GetDsoHandle(), kName);                        \
+      CHECK(f != nullptr) << "could not find " << kName                     \
+                          << " in cuBLAS DSO; dlerror: " << dlerror();      \
       return reinterpret_cast<FuncPointerT>(f);                             \
     }                                                                       \
-    static FuncPointerT DynLoad() {                                         \
-      static FuncPointerT f = LoadOrDie();                                  \
-      return f;                                                             \
-    }                                                                       \
     template <typename... Args>                                             \
-    cublasStatus_t operator()(CUDAExecutor *parent, Args... args) {         \
+    cublasStatus_t operator()(CUDAExecutor * parent, Args... args) {        \
       cuda::ScopedActivateExecutorContext sac{parent};                      \
       return DynLoad()(args...);                                            \
     }                                                                       \

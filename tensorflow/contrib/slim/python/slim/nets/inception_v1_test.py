@@ -110,7 +110,8 @@ class InceptionV1Test(tf.test.TestCase):
     batch_size = 5
     height, width = 224, 224
     inputs = tf.random_uniform((batch_size, height, width, 3))
-    with slim.arg_scope(inception.inception_v1_arg_scope()):
+    with slim.arg_scope([slim.conv2d, slim.separable_conv2d],
+                        normalizer_fn=slim.batch_norm):
       inception.inception_v1_base(inputs)
     total_params, _ = slim.model_analyzer.analyze_vars(
         slim.get_model_variables())
@@ -144,7 +145,7 @@ class InceptionV1Test(tf.test.TestCase):
       pre_pool_out = sess.run(pre_pool, feed_dict=feed_dict)
       self.assertListEqual(list(pre_pool_out.shape), [batch_size, 7, 7, 1024])
 
-  def testUnknownBatchSize(self):
+  def testUnknowBatchSize(self):
     batch_size = 1
     height, width = 224, 224
     num_classes = 1000

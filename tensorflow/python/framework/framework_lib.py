@@ -51,7 +51,6 @@
 ## Defining new operations
 
 @@RegisterGradient
-@@NotDifferentiable
 @@NoGradient
 @@RegisterShape
 @@TensorShape
@@ -98,7 +97,6 @@ from tensorflow.python.framework.importer import import_graph_def
 
 # Needed when you defined a new Op in C++.
 from tensorflow.python.framework.ops import RegisterGradient
-from tensorflow.python.framework.ops import NotDifferentiable
 from tensorflow.python.framework.ops import NoGradient
 from tensorflow.python.framework.ops import RegisterShape
 from tensorflow.python.framework.tensor_shape import Dimension

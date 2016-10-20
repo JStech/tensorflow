@@ -16,13 +16,10 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/gpu/pool_allocator.h"
 
 #include <errno.h>
-#ifndef _MSC_VER
 #include <strings.h>
 #include <sys/mman.h>  // for munmap
-#endif
 
 #include <map>
-#include <utility>
 
 #include "tensorflow/core/lib/strings/numbers.h"
 #include "tensorflow/core/platform/logging.h"
@@ -34,7 +31,7 @@ namespace tensorflow {
 PoolAllocator::PoolAllocator(size_t pool_size_limit, bool auto_resize,
                              SubAllocator* allocator,
                              RoundUpInterface* size_rounder, string name)
-    : name_(std::move(name)),
+    : name_(name),
       has_size_limit_(pool_size_limit > 0),
       auto_resize_(auto_resize),
       pool_size_limit_(pool_size_limit),
@@ -128,7 +125,7 @@ void* PoolAllocator::AllocateRaw(size_t alignment, size_t num_bytes) {
     return PrepareChunk(r, alignment, num_bytes);
   } else {
     void* ptr = allocator_->Alloc(kPoolAlignment, num_bytes);
-    for (const auto& v : alloc_visitors_) {
+    for (auto v : alloc_visitors_) {
       v(ptr, num_bytes);
     }
     return PrepareChunk(ptr, alignment, num_bytes);
@@ -140,7 +137,7 @@ void PoolAllocator::DeallocateRaw(void* ptr) {
   ChunkPrefix* cp = FindPrefix(ptr);
   CHECK_LE((void*)cp, (void*)ptr);
   if (!has_size_limit_ && !auto_resize_) {
-    for (const auto& v : free_visitors_) {
+    for (auto v : free_visitors_) {
       v(cp, cp->num_bytes);
     }
     allocator_->Free(cp, cp->num_bytes);
@@ -163,7 +160,7 @@ void PoolAllocator::Clear() {
     mutex_lock lock(mutex_);
     for (auto iter : pool_) {
       PtrRecord* pr = iter.second;
-      for (const auto& v : free_visitors_) {
+      for (auto v : free_visitors_) {
         v(pr->ptr, pr->num_bytes);
       }
       allocator_->Free(pr->ptr, pr->num_bytes);
@@ -220,7 +217,7 @@ void PoolAllocator::EvictOne() {
     DCHECK(iter != pool_.end());
   }
   pool_.erase(iter);
-  for (const auto& v : free_visitors_) {
+  for (auto v : free_visitors_) {
     v(prec->ptr, prec->num_bytes);
   }
   allocator_->Free(prec->ptr, prec->num_bytes);

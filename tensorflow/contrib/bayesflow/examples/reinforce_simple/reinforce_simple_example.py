@@ -23,7 +23,6 @@ import tensorflow as tf
 
 distributions = tf.contrib.distributions
 sg = tf.contrib.bayesflow.stochastic_graph
-st = tf.contrib.bayesflow.stochastic_tensor
 
 
 def split_apply_merge(inp, partitions, fns):
@@ -75,7 +74,7 @@ def build_split_apply_merge_model():
   logits = tf.matmul(inputs, weights) + bias
 
   # REINFORCE forward step
-  route_selection = st.StochasticTensor(
+  route_selection = sg.DistributionTensor(
       distributions.Categorical, logits=logits)
 
   # Accessing route_selection as a Tensor below forces a sample of
@@ -113,7 +112,7 @@ class REINFORCESimpleExample(tf.test.TestCase):
 
     with self.test_session() as sess:
       # Use sampling to train REINFORCE
-      with st.value_type(st.SampleAndReshapeValue(n=1)):
+      with sg.value_type(sg.SampleAndReshapeValue(n=1)):
         (route_selection,
          routing_loss,
          final_loss) = build_split_apply_merge_model()

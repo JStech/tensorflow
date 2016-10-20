@@ -26,9 +26,10 @@ import tensorflow as tf
 class SpaceToDepthTest(tf.test.TestCase):
 
   def _testOne(self, inputs, block_size, outputs):
-    with self.test_session(use_gpu=True):
-      x_tf = tf.space_to_depth(tf.to_float(inputs), block_size)
-      self.assertAllEqual(x_tf.eval(), outputs)
+    for use_gpu in [False, True]:
+      with self.test_session(use_gpu=use_gpu):
+        x_tf = tf.space_to_depth(tf.to_float(inputs), block_size)
+        self.assertAllEqual(x_tf.eval(), outputs)
 
   def testBasic(self):
     x_np = [[[[1], [2]],
@@ -168,7 +169,7 @@ class SpaceToDepthTest(tf.test.TestCase):
     x_np = [[[[1], [2]],
              [[3], [4]]]]
     block_size = 10
-    with self.assertRaises(ValueError):
+    with self.assertRaises(IndexError):
       out_tf = tf.space_to_depth(x_np, block_size)
       out_tf.eval()
 
@@ -177,7 +178,7 @@ class SpaceToDepthTest(tf.test.TestCase):
     x_np = [[[[1], [2], [3]],
              [[3], [4], [7]]]]
     block_size = 3
-    with self.assertRaises(ValueError):
+    with self.assertRaises(IndexError):
       _ = tf.space_to_depth(x_np, block_size)
 
   def testBlockSizeNotDivisibleHeight(self):
@@ -186,7 +187,7 @@ class SpaceToDepthTest(tf.test.TestCase):
              [[3], [4]],
              [[5], [6]]]]
     block_size = 3
-    with self.assertRaises(ValueError):
+    with self.assertRaises(IndexError):
       _ = tf.space_to_depth(x_np, block_size)
 
   def testBlockSizeNotDivisibleBoth(self):
@@ -194,7 +195,7 @@ class SpaceToDepthTest(tf.test.TestCase):
     x_np = [[[[1], [2]],
              [[3], [4]]]]
     block_size = 3
-    with self.assertRaises(ValueError):
+    with self.assertRaises(IndexError):
       _ = tf.space_to_depth(x_np, block_size)
 
   def testUnknownShape(self):
@@ -207,7 +208,7 @@ class SpaceToDepthGradientTest(tf.test.TestCase):
   # Check the gradients.
   def _checkGrad(self, x, block_size):
     assert 4 == x.ndim
-    with self.test_session(use_gpu=True):
+    with self.test_session():
       tf_x = tf.convert_to_tensor(x)
       tf_y = tf.space_to_depth(tf_x, block_size)
       epsilon = 1e-2

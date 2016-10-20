@@ -171,7 +171,4 @@ message TestResults {
 
   // Run-specific parameters (arguments, etc)
   RunConfiguration run_configuration = 8;
-
-  // Benchmark target identifier.
-  string name = 9;
 };

@@ -27,12 +27,6 @@ from tensorflow.python.framework import test_util
 from tensorflow.python.platform import googletest
 
 
-def _is_numeric_dtype_enum(datatype_enum):
-  return (datatype_enum != types_pb2.DT_INVALID and
-          datatype_enum != types_pb2.DT_RESOURCE and
-          datatype_enum != types_pb2.DT_RESOURCE_REF)
-
-
 class TypesTest(test_util.TensorFlowTestCase):
 
   def testAllTypesConstructible(self):
@@ -51,7 +45,7 @@ class TypesTest(test_util.TensorFlowTestCase):
 
   def testAllTypesConvertibleToNumpyDtype(self):
     for datatype_enum in types_pb2.DataType.values():
-      if not _is_numeric_dtype_enum(datatype_enum):
+      if datatype_enum == types_pb2.DT_INVALID:
         continue
       dtype = tf.as_dtype(datatype_enum)
       numpy_dtype = dtype.as_numpy_dtype
@@ -150,7 +144,6 @@ class TypesTest(test_util.TensorFlowTestCase):
     self.assertEqual(tf.as_dtype("double").is_integer, False)
     self.assertEqual(tf.as_dtype("string").is_integer, False)
     self.assertEqual(tf.as_dtype("bool").is_integer, False)
-    self.assertEqual(tf.as_dtype("bfloat16").is_integer, False)
 
   def testIsFloating(self):
     self.assertEqual(tf.as_dtype("int8").is_floating, False)
@@ -165,7 +158,6 @@ class TypesTest(test_util.TensorFlowTestCase):
     self.assertEqual(tf.as_dtype("float64").is_floating, True)
     self.assertEqual(tf.as_dtype("string").is_floating, False)
     self.assertEqual(tf.as_dtype("bool").is_floating, False)
-    self.assertEqual(tf.as_dtype("bfloat16").is_integer, False)
 
   def testIsComplex(self):
     self.assertEqual(tf.as_dtype("int8").is_complex, False)
@@ -180,7 +172,6 @@ class TypesTest(test_util.TensorFlowTestCase):
     self.assertEqual(tf.as_dtype("float64").is_complex, False)
     self.assertEqual(tf.as_dtype("string").is_complex, False)
     self.assertEqual(tf.as_dtype("bool").is_complex, False)
-    self.assertEqual(tf.as_dtype("bfloat16").is_integer, False)
 
   def testIsUnsigned(self):
     self.assertEqual(tf.as_dtype("int8").is_unsigned, False)
@@ -195,12 +186,11 @@ class TypesTest(test_util.TensorFlowTestCase):
     self.assertEqual(tf.as_dtype("string").is_unsigned, False)
     self.assertEqual(tf.as_dtype("complex64").is_unsigned, False)
     self.assertEqual(tf.as_dtype("complex128").is_unsigned, False)
-    self.assertEqual(tf.as_dtype("bfloat16").is_integer, False)
 
   def testMinMax(self):
     # make sure min/max evaluates for all data types that have min/max
     for datatype_enum in types_pb2.DataType.values():
-      if not _is_numeric_dtype_enum(datatype_enum):
+      if datatype_enum == types_pb2.DT_INVALID:
         continue
       dtype = tf.as_dtype(datatype_enum)
       numpy_dtype = dtype.as_numpy_dtype

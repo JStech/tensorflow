@@ -71,9 +71,9 @@ std::vector<DeviceType> DeviceSet::PrioritizedDeviceTypeList() const {
   std::vector<DeviceType> result;
   std::set<string> seen;
   for (Device* d : devices_) {
-    const auto& t = d->device_type();
+    auto t = d->device_type();
     if (seen.insert(t).second) {
-      result.emplace_back(t);
+      result.emplace_back(DeviceType(t));
     }
   }
   std::sort(result.begin(), result.end(), DeviceTypeComparator);

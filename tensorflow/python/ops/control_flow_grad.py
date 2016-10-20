@@ -129,7 +129,7 @@ def _RefMergeGrad(op, grad, _):
 
 
 @ops.RegisterGradient("Exit")
-def _ExitGrad(op, grad):
+def _ExitGrad(_, grad):
   """Gradients for an exit op are calculated using an Enter op."""
   graph = ops.get_default_graph()
   # pylint: disable=protected-access
@@ -140,12 +140,6 @@ def _ExitGrad(op, grad):
     # computation for this loop. If the attribute `back_prop` is false,
     # no gradient computation.
     return None
-
-  # pylint: disable=protected-access
-  if op._get_control_flow_context().grad_state:
-    raise TypeError("Second-order gradient for while loops not supported.")
-  # pylint: enable=protected-access
-
   if isinstance(grad, ops.Tensor):
     grad_ctxt.AddName(grad.name)
   else:

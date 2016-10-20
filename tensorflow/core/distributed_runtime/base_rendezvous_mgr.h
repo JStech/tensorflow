@@ -162,6 +162,7 @@ class BaseRemoteRendezvous : public Rendezvous {
   const int64 step_id_;
 
  private:
+  const bool tolerate_dup_recv_;
   Rendezvous* local_;  // Owns a Ref on this object.
 
   mutable mutex mu_;

@@ -171,10 +171,8 @@ string PrintAttrValue(string op, const AttrValue& attr_value) {
       return PrintString(attr_value.s());
     case AttrValue::kI:
       return strings::StrCat(attr_value.i());
-    case AttrValue::kF: {
-      const float f = attr_value.f();
-      return strings::StrCat(attr_value.f(), floorf(f) == f ? ".0" : "", "f");
-    }
+    case AttrValue::kF:
+      return strings::StrCat(attr_value.f());
     case AttrValue::kB:
       return attr_value.b() ? "true" : "false";
     case AttrValue::kType:
@@ -201,8 +199,7 @@ string PrintAttrValue(string op, const AttrValue& attr_value) {
       } else if (attr_value.list().f_size() > 0) {
         for (int i = 0; i < attr_value.list().f_size(); ++i) {
           if (i > 0) strings::StrAppend(&ret, ", ");
-          const float f = attr_value.list().f(i);
-          strings::StrAppend(&ret, f, floorf(f) == f ? ".0" : "", "f");
+          strings::StrAppend(&ret, attr_value.list().f(i));
         }
       } else if (attr_value.list().b_size() > 0) {
         for (int i = 0; i < attr_value.list().b_size(); ++i) {
@@ -235,7 +232,7 @@ string PrintAttrValue(string op, const AttrValue& attr_value) {
 string ToCamelCase(const string& str) {
   string result;
   const char joiner = '_';
-  size_t i = 0;
+  int i = 0;
   bool cap = true;
   while (i < str.size()) {
     const char c = str[i++];
@@ -695,13 +692,6 @@ string OpInfo::GetConstructorBody() const {
   strings::StrAppend(&body, "  ", scope_str, ".UpdateBuilder(&builder);\n");
   strings::StrAppend(&body, "  ", scope_str, ".UpdateStatus(builder.Finalize(",
                      scope_str, ".graph(), &ret));\n");
-
-  // TODO(b/28152992): Enable this code-path once we have converted
-  // all python shape functions to call their C++ versions.
-
-  // strings::StrAppend(&body, "  ", scope_str, ".UpdateStatus(", scope_str,
-  //                    ".refiner()->AddNode(ret));\n");
-
   GetOutput(&body);
   return body;
 }
@@ -793,11 +783,6 @@ namespace ops {
   TF_CHECK_OK(cc->Append(cc_header));
 
   for (const auto& op_def : ops.op()) {
-    if (op_def.name() == "Const") {
-      // We use a hand-written wrapper for "Const", since the
-      // generated code depends on it.
-      continue;
-    }
     WriteCCOp(op_def, h.get(), cc.get());
   }
 

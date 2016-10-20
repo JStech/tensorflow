@@ -26,6 +26,7 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 
 from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.python.framework import dtypes
+from tensorflow.python.platform import gfile
 
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -35,25 +36,14 @@ def _read32(bytestream):
   return numpy.frombuffer(bytestream.read(4), dtype=dt)[0]
 
 
-def extract_images(f):
-  """Extract the images into a 4D uint8 numpy array [index, y, x, depth].
-
-  Args:
-    f: A file object that can be passed into a gzip reader.
-
-  Returns:
-    data: A 4D unit8 numpy array [index, y, x, depth].
-
-  Raises:
-    ValueError: If the bytestream does not start with 2051.
-
-  """
-  print('Extracting', f.name)
-  with gzip.GzipFile(fileobj=f) as bytestream:
+def extract_images(filename):
+  """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
+  print('Extracting', filename)
+  with gfile.Open(filename, 'rb') as f, gzip.GzipFile(fileobj=f) as bytestream:
     magic = _read32(bytestream)
     if magic != 2051:
       raise ValueError('Invalid magic number %d in MNIST image file: %s' %
-                       (magic, f.name))
+                       (magic, filename))
     num_images = _read32(bytestream)
     rows = _read32(bytestream)
     cols = _read32(bytestream)
@@ -72,26 +62,14 @@ def dense_to_one_hot(labels_dense, num_classes):
   return labels_one_hot
 
 
-def extract_labels(f, one_hot=False, num_classes=10):
-  """Extract the labels into a 1D uint8 numpy array [index].
-
-  Args:
-    f: A file object that can be passed into a gzip reader.
-    one_hot: Does one hot encoding for the result.
-    num_classes: Number of classes for the one hot encoding.
-
-  Returns:
-    labels: a 1D unit8 numpy array.
-
-  Raises:
-    ValueError: If the bystream doesn't start with 2049.
-  """
-  print('Extracting', f.name)
-  with gzip.GzipFile(fileobj=f) as bytestream:
+def extract_labels(filename, one_hot=False, num_classes=10):
+  """Extract the labels into a 1D uint8 numpy array [index]."""
+  print('Extracting', filename)
+  with gfile.Open(filename, 'rb') as f, gzip.GzipFile(fileobj=f) as bytestream:
     magic = _read32(bytestream)
     if magic != 2049:
       raise ValueError('Invalid magic number %d in MNIST label file: %s' %
-                       (magic, f.name))
+                       (magic, filename))
     num_items = _read32(bytestream)
     buf = bytestream.read(num_items)
     labels = numpy.frombuffer(buf, dtype=numpy.uint8)
@@ -209,23 +187,19 @@ def read_data_sets(train_dir,
 
   local_file = base.maybe_download(TRAIN_IMAGES, train_dir,
                                    SOURCE_URL + TRAIN_IMAGES)
-  with open(local_file, 'rb') as f:
-    train_images = extract_images(f)
+  train_images = extract_images(local_file)
 
   local_file = base.maybe_download(TRAIN_LABELS, train_dir,
                                    SOURCE_URL + TRAIN_LABELS)
-  with open(local_file, 'rb') as f:
-    train_labels = extract_labels(f, one_hot=one_hot)
+  train_labels = extract_labels(local_file, one_hot=one_hot)
 
   local_file = base.maybe_download(TEST_IMAGES, train_dir,
                                    SOURCE_URL + TEST_IMAGES)
-  with open(local_file, 'rb') as f:
-    test_images = extract_images(f)
+  test_images = extract_images(local_file)
 
   local_file = base.maybe_download(TEST_LABELS, train_dir,
                                    SOURCE_URL + TEST_LABELS)
-  with open(local_file, 'rb') as f:
-    test_labels = extract_labels(f, one_hot=one_hot)
+  test_labels = extract_labels(local_file, one_hot=one_hot)
 
   if not 0 <= validation_size <= len(train_images):
     raise ValueError(

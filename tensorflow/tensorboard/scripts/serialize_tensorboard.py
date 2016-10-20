@@ -25,11 +25,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
+import gzip
 import json
 import os
 import os.path
 import shutil
+import StringIO
 import threading
 import urllib
 
@@ -40,7 +41,21 @@ import tensorflow as tf
 from tensorflow.python.summary import event_multiplexer
 from tensorflow.tensorboard.backend import server
 
-FLAGS = None
+tf.flags.DEFINE_string('logdir', None, """the logdir to pass to the TensorBoard
+backend; data will be read from this logdir for serialization.""")
+
+tf.flags.DEFINE_string('target', None, """The directoy where serialized data
+will be written""")
+
+tf.flags.DEFINE_boolean('overwrite', False, """Whether to remove and overwrite
+TARGET if it already exists.""")
+
+tf.flags.DEFINE_boolean(
+    'purge_orphaned_data', True, 'Whether to purge data that '
+    'may have been orphaned due to TensorBoard restarts. '
+    'Disabling purge_orphaned_data can be used to debug data '
+    'disappearance.')
+FLAGS = tf.flags.FLAGS
 
 BAD_CHARACTERS = "#%&{}\\/<>*? $!'\":@+`|="
 DEFAULT_SUFFIX = '.json'
@@ -74,7 +89,7 @@ class TensorBoardStaticSerializer(object):
     EnsureDirectoryExists(target_path)
     self.path = target_path
 
-  def GetAndSave(self, url, save_suffix):
+  def GetAndSave(self, url, save_suffix, unzip=False):
     """GET the given url. Serialize the result at clean path version of url."""
     self.connection.request('GET',
                             '/data/' + url,
@@ -86,7 +101,11 @@ class TensorBoardStaticSerializer(object):
     if response.status != 200:
       raise IOError(url)
 
-    content = response.read()
+    if unzip:
+      s = StringIO.StringIO(response.read())
+      content = gzip.GzipFile(fileobj=s).read()
+    else:
+      content = response.read()
 
     with open(destination, 'w') as f:
       f.write(content)
@@ -113,7 +132,7 @@ class TensorBoardStaticSerializer(object):
             # in this case, tags is a bool which specifies if graph is present.
             if tags:
               url = Url('graph', {'run': run})
-              self.GetAndSave(url, GRAPH_SUFFIX)
+              self.GetAndSave(url, GRAPH_SUFFIX, unzip=True)
           elif tag_type == 'images':
             for t in tags:
               images = self.GetRouteAndSave('images', {'run': run, 'tag': t})
@@ -131,7 +150,7 @@ class TensorBoardStaticSerializer(object):
           elif tag_type == 'run_metadata':
             for t in tags:
               url = Url('run_metadata', {'run': run, 'tag': t})
-              self.GetAndSave(url, GRAPH_SUFFIX)
+              self.GetAndSave(url, GRAPH_SUFFIX, unzip=True)
           elif tag_type == 'firstEventTimestamp':
             pass
           else:
@@ -139,8 +158,11 @@ class TensorBoardStaticSerializer(object):
             # Save this, whatever it is :)
               self.GetRouteAndSave(tag_type, {'run': run, 'tag': t})
         except IOError as e:
-          x = Exception('Retrieval failed for %s/%s/%s' % (tag_type, run, tags))
-          six.raise_from(x, e)
+          PrintAndLog('Retrieval failed for %s/%s/%s' % (tag_type, run, tags),
+                      tf.logging.WARN)
+          PrintAndLog('Got Exception: %s' % e, tf.logging.WARN)
+          PrintAndLog('continuing...', tf.logging.WARN)
+          continue
 
 
 def EnsureDirectoryExists(path):
@@ -178,7 +200,7 @@ def main(unused_argv=None):
   server.ReloadMultiplexer(multiplexer, path_to_run)
 
   PrintAndLog('Multiplexer load finished. Starting TensorBoard server.')
-  s = server.BuildServer(multiplexer, 'localhost', 0, logdir)
+  s = server.BuildServer(multiplexer, 'localhost', 0)
   server_thread = threading.Thread(target=s.serve_forever)
   server_thread.daemon = True
   server_thread.start()
@@ -195,38 +217,4 @@ def main(unused_argv=None):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      '--logdir',
-      type=str,
-      default=None,
-      help="""\
-      the logdir to pass to the TensorBoard backend; data will be read from
-      this logdir for serialization.\
-      """
-  )
-  parser.add_argument(
-      '--target',
-      type=str,
-      default=None,
-      help='The directoy where serialized data will be written'
-  )
-  parser.add_argument(
-      '--overwrite',
-      default=False,
-      help='Whether to remove and overwrite TARGET if it already exists.',
-      action='store_true'
-  )
-  parser.add_argument(
-      '--purge_orphaned_data',
-      type=bool,
-      default=True,
-      help="""\
-      Whether to purge data that may have been orphaned due to TensorBoard
-      restarts. Disabling purge_orphaned_data can be used to debug data
-      disappearance.\
-      """
-  )
-  FLAGS = parser.parse_args()
-
   tf.app.run()

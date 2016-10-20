@@ -15,12 +15,11 @@ For example:
 tf.real(input) ==> [-2.25, 3.25]
 ```
 
-If `input` is already real, it is returned unchanged.
-
 ##### Args:
 
 
-*  <b>`input`</b>: A `Tensor`. Must have numeric type.
+*  <b>`input`</b>: A `Tensor`. Must be one of the following types: `complex64`,
+       `complex128`.
 *  <b>`name`</b>: A name for the operation (optional).
 
 ##### Returns:

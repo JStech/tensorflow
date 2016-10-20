@@ -125,7 +125,6 @@ GoogleAuthProvider::GoogleAuthProvider(
       env_(env) {}
 
 Status GoogleAuthProvider::GetToken(string* t) {
-  mutex_lock lock(mu_);
   const uint64 now_sec = env_->NowSeconds();
 
   if (!current_token_.empty() &&

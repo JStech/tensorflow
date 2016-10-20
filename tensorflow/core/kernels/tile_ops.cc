@@ -138,8 +138,7 @@ class TileOp : public OpKernel {
   HANDLE_DIM(T, 2)     \
   HANDLE_DIM(T, 3)     \
   HANDLE_DIM(T, 4)     \
-  HANDLE_DIM(T, 5)     \
-  HANDLE_DIM(T, 6)
+  HANDLE_DIM(T, 5)
 
 #define HANDLE_TYPE_NAME(T) HANDLE_TYPE(DataTypeToEnum<T>::value)
 
@@ -216,8 +215,7 @@ inline void TileOp<Device>::HandleCase(
   HANDLE_CASE(device, T, dtype, 2);       \
   HANDLE_CASE(device, T, dtype, 3);       \
   HANDLE_CASE(device, T, dtype, 4);       \
-  HANDLE_CASE(device, T, dtype, 5);       \
-  HANDLE_CASE(device, T, dtype, 6);
+  HANDLE_CASE(device, T, dtype, 5);
 
 #define HANDLE_TYPE_NAME_CPU(T) \
   HANDLE_CASE_DIM(CPUDevice, T, DataTypeToEnum<T>::value);
@@ -244,8 +242,6 @@ TF_CALL_int16(HANDLE_TYPE_NAME_GPU);
 TF_CALL_int32(HANDLE_TYPE_NAME_GPU);
 TF_CALL_int64(HANDLE_TYPE_NAME_GPU);
 TF_CALL_half(HANDLE_TYPE_NAME_GPU);
-TF_CALL_complex64(HANDLE_TYPE_NAME_GPU);
-TF_CALL_complex128(HANDLE_TYPE_NAME_GPU);
 #endif  // GOOGLE_CUDA
 
 #undef HANDLE_TYPE_NAME_CPU
@@ -311,8 +307,7 @@ class TileGradientOp : public OpKernel {
   HANDLE_DIM(T, 2)     \
   HANDLE_DIM(T, 3)     \
   HANDLE_DIM(T, 4)     \
-  HANDLE_DIM(T, 5)     \
-  HANDLE_DIM(T, 6)
+  HANDLE_DIM(T, 5)
 
 #define HANDLE_TYPE_NAME(T) HANDLE_TYPE(DataTypeToEnum<T>::value)
 
@@ -322,8 +317,6 @@ class TileGradientOp : public OpKernel {
     TF_CALL_int16(HANDLE_TYPE_NAME);
     TF_CALL_int64(HANDLE_TYPE_NAME);
     TF_CALL_half(HANDLE_TYPE_NAME);
-    TF_CALL_complex64(HANDLE_TYPE_NAME);
-    TF_CALL_complex128(HANDLE_TYPE_NAME);
 
 #undef HANDLE_TYPE_NAME
 #undef HANDLE_TYPE
@@ -458,8 +451,7 @@ inline void TileGradientOp<Device>::HandleCase(
   HANDLE_CASE(device, T, dtype, 2);       \
   HANDLE_CASE(device, T, dtype, 3);       \
   HANDLE_CASE(device, T, dtype, 4);       \
-  HANDLE_CASE(device, T, dtype, 5);       \
-  HANDLE_CASE(device, T, dtype, 6);
+  HANDLE_CASE(device, T, dtype, 5);
 
 #define HANDLE_TYPE_NAME_CPU(T) \
   HANDLE_CASE_DIM(CPUDevice, T, DataTypeToEnum<T>::value);
@@ -483,8 +475,6 @@ TF_CALL_int16(HANDLE_TYPE_NAME_GPU);
 TF_CALL_int32(HANDLE_TYPE_NAME_GPU);
 TF_CALL_int64(HANDLE_TYPE_NAME_GPU);
 TF_CALL_half(HANDLE_TYPE_NAME_GPU);
-TF_CALL_complex64(HANDLE_TYPE_NAME_GPU);
-TF_CALL_complex128(HANDLE_TYPE_NAME_GPU);
 #endif  // GOOGLE_CUDA
 
 #undef HANDLE_TYPE_NAME_CPU
@@ -492,90 +482,55 @@ TF_CALL_complex128(HANDLE_TYPE_NAME_GPU);
 #undef HANDLE_CASE_DIM
 #undef HANDLE_CASE
 
-REGISTER_KERNEL_BUILDER(Name("Tile")
-                            .Device(DEVICE_CPU)
-                            .HostMemory("multiples")
-                            .TypeConstraint<int32>("Tmultiples"),
+REGISTER_KERNEL_BUILDER(Name("Tile").Device(DEVICE_CPU).HostMemory("multiples"),
                         TileOp<CPUDevice>);
-REGISTER_KERNEL_BUILDER(
-    Name("TileGrad").Device(DEVICE_CPU).HostMemory("multiples"),
-    TileGradientOp<CPUDevice>);
+REGISTER_KERNEL_BUILDER(Name("TileGrad")
+                            .Device(DEVICE_CPU)
+                            .HostMemory("multiples"),
+                        TileGradientOp<CPUDevice>);
 
 #if GOOGLE_CUDA
 
 REGISTER_KERNEL_BUILDER(Name("Tile")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<float>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("Tile")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<double>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("Tile")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<Eigen::half>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("Tile")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<int16>("T")
-                            .TypeConstraint<int32>("Tmultiples")
-                            .HostMemory("multiples"),
-                        TileOp<GPUDevice>);
-REGISTER_KERNEL_BUILDER(Name("Tile")
-                            .Device(DEVICE_GPU)
-                            .TypeConstraint<complex64>("T")
-                            .TypeConstraint<int32>("Tmultiples")
-                            .HostMemory("multiples"),
-                        TileOp<GPUDevice>);
-REGISTER_KERNEL_BUILDER(Name("Tile")
-                            .Device(DEVICE_GPU)
-                            .TypeConstraint<complex128>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileOp<GPUDevice>);
 
 REGISTER_KERNEL_BUILDER(Name("TileGrad")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<float>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileGradientOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("TileGrad")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<double>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileGradientOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("TileGrad")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<Eigen::half>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileGradientOp<GPUDevice>);
 REGISTER_KERNEL_BUILDER(Name("TileGrad")
                             .Device(DEVICE_GPU)
                             .TypeConstraint<int16>("T")
-                            .TypeConstraint<int32>("Tmultiples")
                             .HostMemory("multiples"),
                         TileGradientOp<GPUDevice>);
-REGISTER_KERNEL_BUILDER(Name("TileGrad")
-                            .Device(DEVICE_GPU)
-                            .TypeConstraint<complex64>("T")
-                            .TypeConstraint<int32>("Tmultiples")
-                            .HostMemory("multiples"),
-                        TileGradientOp<GPUDevice>);
-REGISTER_KERNEL_BUILDER(Name("TileGrad")
-                            .Device(DEVICE_GPU)
-                            .TypeConstraint<complex128>("T")
-                            .TypeConstraint<int32>("Tmultiples")
-                            .HostMemory("multiples"),
-                        TileGradientOp<GPUDevice>);
-
 #endif  // GOOGLE_CUDA
 }  // namespace tensorflow

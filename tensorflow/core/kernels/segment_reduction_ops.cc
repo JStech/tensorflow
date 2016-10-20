@@ -584,32 +584,26 @@ class SparseSegmentReductionSumOp
                                                 false /*is_sqrtn*/) {}
 };
 
-#define REGISTER_CPU_SPARSE_KERNELS(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("SparseSegmentSum")            \
-                              .Device(DEVICE_CPU)             \
-                              .TypeConstraint<type>("T")      \
-                              .TypeConstraint<int32>("Tidx"), \
-                          SparseSegmentReductionSumOp<CPUDevice, type>);
+#define REGISTER_CPU_SPARSE_KERNELS(type)                                    \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("SparseSegmentSum").Device(DEVICE_CPU).TypeConstraint<type>("T"), \
+      SparseSegmentReductionSumOp<CPUDevice, type>);
 
 TF_CALL_REAL_NUMBER_TYPES(REGISTER_CPU_SPARSE_KERNELS);
 #undef REGISTER_CPU_SPARSE_KERNELS
 
-#define REGISTER_CPU_SPARSE_KERNELS(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("SparseSegmentMean")           \
-                              .Device(DEVICE_CPU)             \
-                              .TypeConstraint<type>("T")      \
-                              .TypeConstraint<int32>("Tidx"), \
-                          SparseSegmentReductionMeanOp<CPUDevice, type>);
+#define REGISTER_CPU_SPARSE_KERNELS(type)                                     \
+  REGISTER_KERNEL_BUILDER(                                                    \
+      Name("SparseSegmentMean").Device(DEVICE_CPU).TypeConstraint<type>("T"), \
+      SparseSegmentReductionMeanOp<CPUDevice, type>);
 REGISTER_CPU_SPARSE_KERNELS(float);
 REGISTER_CPU_SPARSE_KERNELS(double);
 #undef REGISTER_CPU_SPARSE_KERNELS
 
-#define REGISTER_CPU_SPARSE_KERNELS(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("SparseSegmentSqrtN")          \
-                              .Device(DEVICE_CPU)             \
-                              .TypeConstraint<type>("T")      \
-                              .TypeConstraint<int32>("Tidx"), \
-                          SparseSegmentReductionSqrtNOp<CPUDevice, type>);
+#define REGISTER_CPU_SPARSE_KERNELS(type)                                      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("SparseSegmentSqrtN").Device(DEVICE_CPU).TypeConstraint<type>("T"), \
+      SparseSegmentReductionSqrtNOp<CPUDevice, type>);
 REGISTER_CPU_SPARSE_KERNELS(float);
 REGISTER_CPU_SPARSE_KERNELS(double);
 #undef REGISTER_CPU_SPARSE_KERNELS
@@ -733,21 +727,19 @@ class SparseSegmentSqrtNGradOp : public SparseSegmentGradOpBase<T> {
       : SparseSegmentGradOpBase<T>(context, true /*is_sqrtn*/) {}
 };
 
-#define REGISTER_CPU_SPARSE_KERNELS(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("SparseSegmentMeanGrad")       \
-                              .Device(DEVICE_CPU)             \
-                              .TypeConstraint<type>("T")      \
-                              .TypeConstraint<int32>("Tidx"), \
+#define REGISTER_CPU_SPARSE_KERNELS(type)                 \
+  REGISTER_KERNEL_BUILDER(Name("SparseSegmentMeanGrad")   \
+                              .Device(DEVICE_CPU)         \
+                              .TypeConstraint<type>("T"), \
                           SparseSegmentMeanGradOp<type>);
 REGISTER_CPU_SPARSE_KERNELS(float);
 REGISTER_CPU_SPARSE_KERNELS(double);
 #undef REGISTER_CPU_SPARSE_KERNELS
 
-#define REGISTER_CPU_SPARSE_KERNELS(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("SparseSegmentSqrtNGrad")      \
-                              .Device(DEVICE_CPU)             \
-                              .TypeConstraint<type>("T")      \
-                              .TypeConstraint<int32>("Tidx"), \
+#define REGISTER_CPU_SPARSE_KERNELS(type)                 \
+  REGISTER_KERNEL_BUILDER(Name("SparseSegmentSqrtNGrad")  \
+                              .Device(DEVICE_CPU)         \
+                              .TypeConstraint<type>("T"), \
                           SparseSegmentSqrtNGradOp<type>);
 REGISTER_CPU_SPARSE_KERNELS(float);
 REGISTER_CPU_SPARSE_KERNELS(double);

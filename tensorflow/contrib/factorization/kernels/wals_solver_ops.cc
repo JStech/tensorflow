@@ -17,7 +17,6 @@
 // TODO(agarwal,rmlarsen): Add security checks to the code.
 
 #include <algorithm>
-#include <numeric>
 #include <vector>
 
 // This is only used for std::this_thread::get_id()

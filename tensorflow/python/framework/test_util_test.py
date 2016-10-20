@@ -33,6 +33,7 @@ from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import googletest
+from tensorflow.python.ops import logging_ops
 
 
 class TestUtilTest(test_util.TensorFlowTestCase):
@@ -185,9 +186,9 @@ class TestUtilTest(test_util.TensorFlowTestCase):
       with self.test_session(force_gpu=True):
         # this relies on us not having a GPU implementation for assert, which
         # seems sensible
-        x = tf.constant(True)
+        x = [True]
         y = [15]
-        tf.Assert(x, y).run()
+        logging_ops.Assert(x, y).run()
 
   def testRandomSeed(self):
     a = random.randint(1, 1000)

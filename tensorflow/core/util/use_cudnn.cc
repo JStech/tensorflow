@@ -15,39 +15,35 @@ limitations under the License.
 
 #include "tensorflow/core/util/use_cudnn.h"
 
+#include <stdlib.h>
+
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/platform/types.h"
-#include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
-bool CanUseCudnn() {
-  bool value;
-  Status status = ReadBoolFromEnvVar("TF_USE_CUDNN", true, &value);
-  if (!status.ok()) {
-    LOG(ERROR) << status.error_message();
+static bool ReadBoolFromEnvVar(const char* env_var_name, bool default_val) {
+  const char* tf_env_var_val = getenv(env_var_name);
+  if (tf_env_var_val != nullptr) {
+    StringPiece tf_env_var_val_str(tf_env_var_val);
+    if (tf_env_var_val_str == "0") {
+      return false;
+    }
+    return true;
   }
-  return value;
+  return default_val;
 }
 
+bool CanUseCudnn() { return ReadBoolFromEnvVar("TF_USE_CUDNN", true); }
+
 bool CudnnUseAutotune() {
-  bool value;
-  Status status = ReadBoolFromEnvVar("TF_CUDNN_USE_AUTOTUNE", true, &value);
-  if (!status.ok()) {
-    LOG(ERROR) << status.error_message();
-  }
-  return value;
+  return ReadBoolFromEnvVar("TF_CUDNN_USE_AUTOTUNE", true);
 }
 
 namespace internal {
 
 bool AvgPoolUseCudnn() {
-  bool value;
-  Status status = ReadBoolFromEnvVar("TF_AVGPOOL_USE_CUDNN", false, &value);
-  if (!status.ok()) {
-    LOG(ERROR) << status.error_message();
-  }
-  return value;
+  return ReadBoolFromEnvVar("TF_AVGPOOL_USE_CUDNN", false);
 }
 
 }  // namespace internal

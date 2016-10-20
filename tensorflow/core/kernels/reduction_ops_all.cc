@@ -18,18 +18,12 @@ limitations under the License.
 namespace tensorflow {
 
 REGISTER_KERNEL_BUILDER(
-    Name("All")
-        .TypeConstraint<int32>("Tidx")
-        .Device(DEVICE_CPU)
-        .HostMemory("reduction_indices"),
+    Name("All").Device(DEVICE_CPU).HostMemory("reduction_indices"),
     ReductionOp<CPUDevice, bool, Eigen::internal::AndReducer>);
 
 #if GOOGLE_CUDA
 REGISTER_KERNEL_BUILDER(
-    Name("All")
-        .TypeConstraint<int32>("Tidx")
-        .Device(DEVICE_GPU)
-        .HostMemory("reduction_indices"),
+    Name("All").Device(DEVICE_GPU).HostMemory("reduction_indices"),
     ReductionOp<GPUDevice, bool, Eigen::internal::AndReducer>);
 #endif
 

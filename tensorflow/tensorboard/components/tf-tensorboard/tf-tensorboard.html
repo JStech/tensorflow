@@ -1,28 +1,9 @@
-<!--
-@license
-Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
-
 <link rel="import" href="../polymer/polymer.html">
-<link rel="import" href="../iron-icons/iron-icons.html">
 <link rel="import" href="../paper-tabs/paper-tabs.html">
 <link rel="import" href="../paper-dialog/paper-dialog.html">
 <link rel="import" href="../paper-checkbox/paper-checkbox.html">
 <link rel="import" href="../paper-toolbar/paper-toolbar.html">
 <link rel="import" href="../paper-button/paper-button.html">
-<link rel="import" href="../paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../paper-header-panel/paper-header-panel.html">
 <link rel="import" href="../tf-globals/tf-globals.html">
 <link rel="import" href="../tf-event-dashboard/tf-event-dashboard.html">
@@ -34,7 +15,6 @@ limitations under the License.
 <link rel="import" href="../tf-dashboard-common/tensorboard-color.html">
 <link rel="import" href="../tf-backend/tf-backend.html">
 <link rel="import" href="../tf-storage/tf-storage.html">
-<link rel="import" href="../vz-projector/vz-projector-dashboard.html">
 
 <!--
 tf-tensorboard is the frontend entry point for TensorBoard.
@@ -123,13 +103,6 @@ allows the user to toggle between various dashboards.
             id="histograms"
             backend="[[_backend]]"
           ></tf-histogram-dashboard>
-        </template>
-
-        <template is="dom-if" if="[[_modeIsProjections(mode)]]">
-          <vz-projector-dashboard
-            id="projector"
-            route-prefix="/data/plugin/projector">
-          </vz-projector-dashboard>
         </template>
       </div>
     </paper-header-panel>
@@ -262,9 +235,6 @@ allows the user to toggle between various dashboards.
       _modeIsGraphs: function(mode) {
         return mode === "graphs";
       },
-      _modeIsProjections: function(mode) {
-        return mode === "projections";
-      },
       _modeIsDistributions: function(mode) {
         return mode === "distributions";
       },
@@ -298,7 +268,7 @@ allows the user to toggle between various dashboards.
         }
       },
       reload: function() {
-        if (this.mode === "graphs" || this.mode === "projections") {
+        if (this.mode === "graphs") {
           return;
         }
         this.selectedDashboard().reload();
@@ -308,6 +278,4 @@ allows the user to toggle between various dashboards.
       },
     });
   </script>
-  <!-- Compiled bundle of all components using ES6 modules. -->
-  <script src="../bundle.js"></script>
 </dom-module>

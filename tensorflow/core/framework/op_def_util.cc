@@ -60,7 +60,7 @@ Status AllowedTypeValue(DataType dt, const OpDef::AttrDef& attr) {
 
 Status AllowedStringValue(const string& str, const OpDef::AttrDef& attr) {
   const AttrValue& allowed_values(attr.allowed_values());
-  for (const auto& allowed : allowed_values.list().s()) {
+  for (auto allowed : allowed_values.list().s()) {
     if (str == allowed) {
       return Status::OK();
     }
@@ -471,13 +471,6 @@ void AddComma(string* s, bool* add_comma) {
   }
 }
 
-// Will add the `name` from arg if name is true.
-void AddName(string* s, bool name, const OpDef::ArgDef& arg) {
-  if (name) {
-    strings::StrAppend(s, arg.name(), ":");
-  }
-}
-
 // Compute a signature for either inputs or outputs that will be the
 // same for both the old and new OpDef if they are compatible.  We
 // assume that new_attrs is a superset of old_attrs, and that any attr
@@ -491,8 +484,8 @@ void AddName(string* s, bool name, const OpDef::ArgDef& arg) {
 // old_attrs, or substituting the default value from new_attrs.
 string ComputeArgSignature(
     const protobuf::RepeatedPtrField<OpDef::ArgDef>& args,
-    const AttrMap& old_attrs, const AttrMap& new_attrs, std::vector<bool>* ref,
-    bool names) {
+    const AttrMap& old_attrs, const AttrMap& new_attrs,
+    std::vector<bool>* ref) {
   string s;
   bool add_comma = false;
   for (const OpDef::ArgDef& arg : args) {
@@ -502,7 +495,6 @@ string ComputeArgSignature(
       if (old_attr) {
         // Both old and new have the list(type) attr, so can use it directly.
         AddComma(&s, &add_comma);
-        AddName(&s, names, arg);
         strings::StrAppend(&s, arg.type_list_attr());
         ref->push_back(arg.is_ref());
       } else {
@@ -514,7 +506,6 @@ string ComputeArgSignature(
         if (type_list.empty()) continue;
         for (int i = 0; i < type_list.size(); ++i) {
           AddComma(&s, &add_comma);
-          AddName(&s, names, arg);
           strings::StrAppend(
               &s, DataTypeString(static_cast<DataType>(type_list.Get(i))));
           ref->push_back(arg.is_ref());
@@ -522,15 +513,15 @@ string ComputeArgSignature(
       }
     } else {
       int num = 1;  // How many input/outputs does this represent?
-      string type;  // What is the type of this arg?
-      AddName(&type, names, arg);
       if (!arg.number_attr().empty()) {
         // N * type case.
         const OpDef::AttrDef* old_attr =
             gtl::FindPtrOrNull(old_attrs, arg.number_attr());
         if (old_attr) {
           // Both old and new have the number attr, so can use it directly.
-          strings::StrAppend(&type, arg.number_attr(), " * ");
+          AddComma(&s, &add_comma);
+          strings::StrAppend(&s, arg.number_attr(), " * ");
+          add_comma = false;  // Don't add another comma before the type.
         } else {
           // Missing the number attr in the old, so use the default
           // value for the attr from new instead.
@@ -540,22 +531,22 @@ string ComputeArgSignature(
         }
       }
 
+      string type;  // What is the type of this arg?
       if (arg.type() != DT_INVALID) {
         // int32, float, etc. case
-        strings::StrAppend(&type, DataTypeString(arg.type()));
+        type = DataTypeString(arg.type());
       } else {
         const OpDef::AttrDef* old_attr =
             gtl::FindPtrOrNull(old_attrs, arg.type_attr());
         if (old_attr) {
           // Both old and new have the type attr, so can use it directly.
-          strings::StrAppend(&type, arg.type_attr());
+          type = arg.type_attr();
         } else {
           // Missing the type attr in the old, so use the default
           // value for the attr from new instead.
           const OpDef::AttrDef* new_attr =
               gtl::FindPtrOrNull(new_attrs, arg.type_attr());
-          strings::StrAppend(&type,
-                             DataTypeString(new_attr->default_value().type()));
+          type = DataTypeString(new_attr->default_value().type());
         }
       }
 
@@ -609,10 +600,10 @@ Status OpDefCompatible(const OpDef& old_op, const OpDef& new_op) {
   }
 
   std::vector<bool> old_in_ref, new_in_ref, old_out_ref, new_out_ref;
-  const string old_in_sig = ComputeArgSignature(
-      old_op.input_arg(), old_attrs, new_attrs, &old_in_ref, false /* names */);
-  const string new_in_sig = ComputeArgSignature(
-      new_op.input_arg(), old_attrs, new_attrs, &new_in_ref, false /* names */);
+  const string old_in_sig = ComputeArgSignature(old_op.input_arg(), old_attrs,
+                                                new_attrs, &old_in_ref);
+  const string new_in_sig = ComputeArgSignature(new_op.input_arg(), old_attrs,
+                                                new_attrs, &new_in_ref);
   VALIDATE(old_in_sig == new_in_sig, "Input signature mismatch '", old_in_sig,
            "' vs. '", new_in_sig, "'");
   VALIDATE(old_in_ref.size() == new_in_ref.size(),  // Should not happen
@@ -623,12 +614,10 @@ Status OpDefCompatible(const OpDef& old_op, const OpDef& new_op) {
              " changed from non-ref to ref");
   }
 
-  const string old_out_sig =
-      ComputeArgSignature(old_op.output_arg(), old_attrs, new_attrs,
-                          &old_out_ref, true /* names */);
-  const string new_out_sig =
-      ComputeArgSignature(new_op.output_arg(), old_attrs, new_attrs,
-                          &new_out_ref, true /* names */);
+  const string old_out_sig = ComputeArgSignature(old_op.output_arg(), old_attrs,
+                                                 new_attrs, &old_out_ref);
+  const string new_out_sig = ComputeArgSignature(new_op.output_arg(), old_attrs,
+                                                 new_attrs, &new_out_ref);
   VALIDATE(old_out_sig == new_out_sig, "Output signature mismatch '",
            old_out_sig, "' vs. '", new_out_sig, "'");
   VALIDATE(old_out_ref.size() == new_out_ref.size(),  // Should not happen

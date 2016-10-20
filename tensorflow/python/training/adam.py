@@ -105,8 +105,7 @@ class AdamOptimizer(optimizer.Optimizer):
   def _create_slots(self, var_list):
     # Create the beta1 and beta2 accumulators on the same device as the first
     # variable.
-    if (self._beta1_power is None or
-        self._beta1_power.graph is not var_list[0].graph):
+    if self._beta1_power is None:
       with ops.colocate_with(var_list[0]):
         self._beta1_power = variables.Variable(self._beta1,
                                                name="beta1_power",

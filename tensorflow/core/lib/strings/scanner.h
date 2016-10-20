@@ -128,16 +128,10 @@ class Scanner {
   Scanner& AnySpace() { return Any(SPACE); }
 
   // This scans input until <end_ch> is reached. <end_ch> is NOT consumed.
-  Scanner& ScanUntil(char end_ch) {
-    ScanUntilImpl(end_ch, false);
-    return *this;
-  }
-
-  // This scans input until <end_ch> is reached. <end_ch> is NOT consumed.
   // Backslash escape sequences are skipped.
   // Used for implementing quoted string scanning.
   Scanner& ScanEscapedUntil(char end_ch) {
-    ScanUntilImpl(end_ch, true);
+    ScanEscapedUntilImpl(end_ch);
     return *this;
   }
 
@@ -160,7 +154,7 @@ class Scanner {
                  StringPiece* capture = nullptr);
 
  private:
-  void ScanUntilImpl(char end_ch, bool escaped);
+  void ScanEscapedUntilImpl(char end_ch);
 
   Scanner& Error() {
     error_ = true;

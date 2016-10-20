@@ -24,7 +24,7 @@ from tensorflow.contrib.learn.python.learn.dataframe import transform
 from tensorflow.python.ops import parsing_ops
 
 
-class ExampleParser(transform.TensorFlowTransform):
+class ExampleParser(transform.Transform):
   """A Transform that parses serialized `tensorflow.Example` protos."""
 
   def __init__(self, features):

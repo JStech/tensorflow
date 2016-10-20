@@ -136,19 +136,6 @@ spec:
   selector:
     tf-ps: "{param_server_id}"
 """)
-PARAM_LB_SVC = ("""apiVersion: v1
-kind: Service
-metadata:
-  name: tf-ps{param_server_id}
-  labels:
-    tf-ps: "{param_server_id}"
-spec:
-  type: LoadBalancer
-  ports:
-  - port: {port}
-  selector:
-    tf-ps: "{param_server_id}"
-""")
 
 
 def main():
@@ -231,10 +218,8 @@ def GenerateConfig(num_workers,
                                                   num_param_servers,
                                                   port))
     config += '---\n'
-    if request_load_balancer:
-      config += PARAM_LB_SVC.format(port=port, param_server_id=param_server)
-    else:
-      config += PARAM_SERVER_SVC.format(port=port, param_server_id=param_server)
+    config += PARAM_SERVER_SVC.format(port=port,
+                                      param_server_id=param_server)
     config += '---\n'
 
   return config

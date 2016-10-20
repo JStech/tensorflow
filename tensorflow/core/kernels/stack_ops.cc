@@ -16,7 +16,6 @@ limitations under the License.
 // See docs in ../ops/data_flow_ops.cc.
 
 #include <limits.h>
-#include <atomic>
 #include <vector>
 
 #include "tensorflow/core/common_runtime/device.h"
@@ -44,8 +43,6 @@ typedef Eigen::GpuDevice GPUDevice;
 
 class Stack : public ResourceBase {
  public:
-  static std::atomic<int64> stack_counter;
-
   struct TensorAndAllocation {
     Tensor tensor;
     AllocatorAttributes alloc_attrs;
@@ -138,8 +135,6 @@ Status GetStack(OpKernelContext* ctx, Stack** stack) {
   return Status::OK();
 }
 
-std::atomic<int64> Stack::stack_counter{0};
-
 // A per-run local stack. The stack uses a "per-step" resource manager which
 // ensures that correct garbage collection on error or successful completion.
 class StackOp : public OpKernel {
@@ -158,16 +153,15 @@ class StackOp : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_temp(tensorflow::DT_STRING,
                                            tensorflow::TensorShape({2}),
                                            &stack_handle, alloc_attr));
-    auto stack_id = Stack::stack_counter.fetch_add(1);
     auto handle = stack_handle.flat<string>();
     handle(0) = "_stacks";
-    handle(1) = strings::StrCat(stack_name_, "_", stack_id);
+    handle(1) = stack_name_;
     // Store the handle in a container of the per-step RM.
     ResourceMgr* rm = ctx->step_resource_manager();
     OP_REQUIRES(ctx, rm != nullptr,
                 errors::Internal("No per-step resource manager."));
     Stack* stack = new Stack(elem_type_, stack_handle);
-    OP_REQUIRES_OK(ctx, rm->Create(handle(0), handle(1), stack));
+    OP_REQUIRES_OK(ctx, rm->Create(handle(0), stack_name_, stack));
     ctx->set_output_ref(0, stack->mu(), stack->handle());
   }
 
@@ -192,13 +186,18 @@ class StackPushOp : public AsyncOpKernel {
   void ComputeAsync(OpKernelContext* ctx, DoneCallback done) override {
     // Get the stack from the handle.
     Stack* stack = nullptr;
-    OP_REQUIRES_OK_ASYNC(ctx, GetStack(ctx, &stack), done);
+    Status s = GetStack(ctx, &stack);
+    if (!s.ok()) {
+      ctx->CtxFailureWithWarning(s);
+      done();
+      return;
+    }
     core::ScopedUnref unref(stack);
 
     if (ctx->input_dtype(1) != stack->ElemType()) {
-      ctx->CtxFailure(errors::InvalidArgument("Must have type ",
-                                              stack->ElemType(), " but got ",
-                                              ctx->input_dtype(1)));
+      ctx->CtxFailureWithWarning(
+          errors::InvalidArgument("Must have type ", stack->ElemType(),
+                                  " but got ", ctx->input_dtype(1)));
       done();
       return;
     }
@@ -295,13 +294,23 @@ class StackPopOp : public AsyncOpKernel {
   void ComputeAsync(OpKernelContext* ctx, DoneCallback done) override {
     // Get the stack from the handle.
     Stack* stack = nullptr;
-    OP_REQUIRES_OK_ASYNC(ctx, GetStack(ctx, &stack), done);
+    Status s = GetStack(ctx, &stack);
+    if (!s.ok()) {
+      ctx->CtxFailureWithWarning(s);
+      done();
+      return;
+    }
     core::ScopedUnref unref(stack);
 
     // Pop the tensor. Transfer the tensor back to device if it was
     // swapped out to CPU.
     Stack::TensorAndAllocation value;
-    OP_REQUIRES_OK_ASYNC(ctx, stack->Pop(&value), done);
+    s = stack->Pop(&value);
+    if (!s.ok()) {
+      ctx->CtxFailureWithWarning(s);
+      done();
+      return;
+    }
     if (value.swapped_to_cpu) {
       // Asynchronously copy the tensor back from CPU to GPU memory.
       DeviceContext* device_ctxt = ctx->op_device_context();

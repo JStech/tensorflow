@@ -49,13 +49,12 @@ struct ImageResizerState {
   explicit ImageResizerState(bool align_corners)
       : align_corners_(align_corners) {}
 
-  // ValidateAndCalculateOutputSize checks the bounds on the input tensors
+  // ValidateAndCreateOutput checks the bounds on the input tensors
   // and requested size, sets up some of the resizing state such as the
-  // height_scale and width_scale, and calculates the output size.
+  // height_scale and width_scale, and allocates the output.
   // If any of these operations fails, it sets an error status in
   // the context, which the caller must check.
-  void ValidateAndCalculateOutputSize(OpKernelContext* context,
-                                      const Tensor& input) {
+  void ValidateAndCreateOutput(OpKernelContext* context, const Tensor& input) {
     OP_REQUIRES(context, input.dims() == 4,
                 errors::InvalidArgument("input must be 4-dimensional",
                                         input.shape().DebugString()));
@@ -88,18 +87,12 @@ struct ImageResizerState {
     OP_REQUIRES(
         context, input.dim_size(1) > 0 && input.dim_size(2) > 0,
         errors::InvalidArgument("input image must be of non-zero size"));
-    height_scale = CalculateResizeScale(in_height, out_height, align_corners_);
-    width_scale = CalculateResizeScale(in_width, out_width, align_corners_);
-  }
-
-  // Calculates all the required variables, and allocates the output.
-  void ValidateAndCreateOutput(OpKernelContext* context, const Tensor& input) {
-    ValidateAndCalculateOutputSize(context, input);
-    if (!context->status().ok()) return;
     OP_REQUIRES_OK(context, context->allocate_output(
                                 0, TensorShape({input.dim_size(0), out_height,
                                                 out_width, input.dim_size(3)}),
                                 &output));
+    height_scale = CalculateResizeScale(in_height, out_height, align_corners_);
+    width_scale = CalculateResizeScale(in_width, out_width, align_corners_);
   }
 
   int64 batch_size;

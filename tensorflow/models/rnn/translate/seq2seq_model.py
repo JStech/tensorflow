@@ -95,8 +95,8 @@ class Seq2SeqModel(object):
     softmax_loss_function = None
     # Sampled softmax only makes sense if we sample less than vocabulary size.
     if num_samples > 0 and num_samples < self.target_vocab_size:
-      w_t = tf.get_variable("proj_w", [self.target_vocab_size, size], dtype=dtype)
-      w = tf.transpose(w_t)
+      w = tf.get_variable("proj_w", [size, self.target_vocab_size], dtype=dtype)
+      w_t = tf.transpose(w)
       b = tf.get_variable("proj_b", [self.target_vocab_size], dtype=dtype)
       output_projection = (w, b)
 
@@ -139,12 +139,12 @@ class Seq2SeqModel(object):
     self.decoder_inputs = []
     self.target_weights = []
     for i in xrange(buckets[-1][0]):  # Last bucket is the biggest one.
-      self.encoder_inputs.append(tf.placeholder(tf.int32, shape=[None],
+      self.encoder_inputs.append(tf.placeholder(tf.int32, shape=[batch_size],
                                                 name="encoder{0}".format(i)))
     for i in xrange(buckets[-1][1] + 1):
-      self.decoder_inputs.append(tf.placeholder(tf.int32, shape=[None],
+      self.decoder_inputs.append(tf.placeholder(tf.int32, shape=[batch_size],
                                                 name="decoder{0}".format(i)))
-      self.target_weights.append(tf.placeholder(dtype, shape=[None],
+      self.target_weights.append(tf.placeholder(dtype, shape=[batch_size],
                                                 name="weight{0}".format(i)))
 
     # Our targets are decoder inputs shifted by one.

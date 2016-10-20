@@ -23,11 +23,11 @@ from tensorflow.contrib.learn.python.learn.dataframe import transform
 from tensorflow.python.ops import string_ops
 
 
-class HashFast(transform.TensorFlowTransform):
+class HashFast(transform.Transform):
   """Perform a fast hash of a `Series`."""
 
   def __init__(self, num_buckets):
-    """Initialize `HashFast`.
+    """Initialize `CSVParser`.
 
     Args:
       num_buckets: The number of hash buckets to use.

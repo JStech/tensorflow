@@ -258,7 +258,7 @@ class ReduceJoinTest(UnicodeTestCase):
 
   def testInvalidReductionIndices(self):
     with self.test_session():
-      with self.assertRaisesRegexp(ValueError, "Invalid reduction dim"):
+      with self.assertRaisesRegexp(ValueError, "scalar"):
         tf.reduce_join(inputs="", reduction_indices=0)
       with self.assertRaisesRegexp(ValueError,
                                    "Invalid reduction dimension -3"):

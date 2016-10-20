@@ -22,24 +22,16 @@ from __future__ import print_function
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import state_ops
 
-# TODO(b/31222613): These ops may be differentiable, and there may be
-# latent bugs here.
-ops.NotDifferentiable("Assign")
+ops.NoGradient("Assign")
 
 
-ops.NotDifferentiable("AssignAdd")
+ops.NoGradient("AssignAdd")
 
 
-ops.NotDifferentiable("AssignSub")
+ops.NoGradient("AssignSub")
 
 
-ops.NotDifferentiable("ScatterAdd")
+ops.NoGradient("ScatterAdd")
 
 
-ops.NotDifferentiable("ScatterSub")
-
-
-ops.NotDifferentiable("ScatterMul")
-
-
-ops.NotDifferentiable("ScatterDiv")
+ops.NoGradient("ScatterSub")

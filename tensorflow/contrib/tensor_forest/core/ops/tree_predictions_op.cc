@@ -35,9 +35,9 @@ using tensorforest::DataColumnTypes;
 using tensorforest::FeatureSpec;
 using tensorforest::Sum;
 
-using shape_inference::DimensionHandle;
+using shape_inference::Dimension;
 using shape_inference::InferenceContext;
-using shape_inference::ShapeHandle;
+using shape_inference::Shape;
 
 REGISTER_OP("TreePredictions")
     .Attr("valid_leaf_threshold: float")
@@ -55,8 +55,8 @@ REGISTER_OP("TreePredictions")
     .SetShapeFn([](InferenceContext* c) {
       // The output of TreePredictions is
       // [node_pcw(evaluate_tree(x), c) for c in classes for x in input_data].
-      DimensionHandle num_points = c->Dim(c->input(0), 0);
-      DimensionHandle num_classes = c->Dim(c->input(7), 1);
+      const Dimension* num_points = c->Dim(c->input(0), 0);
+      const Dimension* num_classes = c->Dim(c->input(7), 1);
 
       if (c->RankKnown(c->input(3)) && c->Rank(c->input(3)) > 0) {
         num_points = c->UnknownDim();
@@ -185,6 +185,10 @@ class TreePredictions : public OpKernel {
       };
     } else {
       num_data = static_cast<int32>(input_data.shape().dim_size(0));
+      int32 num_features = 0;
+      if (num_data > 0) {
+        num_features = input_data.NumElements() / num_data;
+      }
       decide_function = [&input_data](
           int32 i, int32 feature, float bias, DataColumnTypes type) {
         const auto input_matrix = input_data.matrix<float>();

@@ -22,27 +22,8 @@ from __future__ import print_function
 from tensorflow.contrib import metrics as metrics_lib
 from tensorflow.contrib.framework import deprecated_arg_values
 from tensorflow.contrib.learn.python.learn.estimators import estimator
-from tensorflow.contrib.session_bundle import exporter
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
-
-
-def classification_signature_fn(examples, unused_features, predictions):
-  """Creates classification signature from given examples and predictions.
-
-  Args:
-    examples: `Tensor`.
-    unused_features: `dict` of `Tensor`s.
-    predictions: `dict` of `Tensor`s.
-
-  Returns:
-    Tuple of default classification signature and empty named signatures.
-  """
-  signature = exporter.classification_signature(
-      examples,
-      classes_tensor=predictions[Classifier.CLASS_OUTPUT],
-      scores_tensor=predictions[Classifier.PROBABILITY_OUTPUT])
-  return signature, {}
 
 
 def _get_classifier_metrics(unused_n_classes):
@@ -61,8 +42,7 @@ class Classifier(estimator.Estimator):
   CLASS_OUTPUT = 'classes'
   PROBABILITY_OUTPUT = 'probabilities'
 
-  def __init__(self, model_fn, n_classes, model_dir=None, config=None,
-               params=None, feature_engineering_fn=None):
+  def __init__(self, model_fn, n_classes, model_dir=None, config=None):
     """Constructor for Classifier.
 
     Args:
@@ -72,21 +52,11 @@ class Classifier(estimator.Estimator):
         also be used to load checkpoints from the directory into a estimator to
         continue training a previously saved model.
       config: Configuration object (optional)
-      params: `dict` of hyper parameters that will be passed into `model_fn`.
-      feature_engineering_fn: Feature engineering function. Takes features and
-                        targets which are the output of `input_fn` and
-                        returns features and targets which will be fed
-                        into the model.
     """
     self._n_classes = n_classes
     self._logits_fn = model_fn
-    if params:
-      model_fn = self._classifier_model_with_params
-    else:
-      model_fn = self._classifier_model
-    super(Classifier, self).__init__(
-        model_fn=model_fn, model_dir=model_dir, config=config, params=params,
-        feature_engineering_fn=feature_engineering_fn)
+    super(Classifier, self).__init__(model_fn=self._classifier_model,
+                                     model_dir=model_dir, config=config)
 
   def evaluate(self,
                x=None,
@@ -126,7 +96,7 @@ class Classifier(estimator.Estimator):
   @deprecated_arg_values(
       estimator.AS_ITERABLE_DATE, estimator.AS_ITERABLE_INSTRUCTIONS,
       as_iterable=False)
-  def predict(self, x=None, input_fn=None, batch_size=None, as_iterable=True):
+  def predict(self, x=None, input_fn=None, batch_size=None, as_iterable=False):
     """Returns predicted classes for given features.
 
     Args:
@@ -150,17 +120,17 @@ class Classifier(estimator.Estimator):
     """
     predictions = super(Classifier, self).predict(
         x=x, input_fn=input_fn, batch_size=batch_size, as_iterable=as_iterable,
-        outputs=[Classifier.CLASS_OUTPUT])
+        outputs=[self.CLASS_OUTPUT])
     if as_iterable:
-      return (p[Classifier.CLASS_OUTPUT] for p in predictions)
+      return (p[self.CLASS_OUTPUT] for p in predictions)
     else:
-      return predictions[Classifier.CLASS_OUTPUT]
+      return predictions[self.CLASS_OUTPUT]
 
   @deprecated_arg_values(
       estimator.AS_ITERABLE_DATE, estimator.AS_ITERABLE_INSTRUCTIONS,
       as_iterable=False)
   def predict_proba(
-      self, x=None, input_fn=None, batch_size=None, as_iterable=True):
+      self, x=None, input_fn=None, batch_size=None, as_iterable=False):
     """Returns predicted probabilty distributions for given features.
 
     Args:
@@ -184,24 +154,16 @@ class Classifier(estimator.Estimator):
     """
     predictions = super(Classifier, self).predict(
         x=x, input_fn=input_fn, batch_size=batch_size, as_iterable=as_iterable,
-        outputs=[Classifier.PROBABILITY_OUTPUT])
+        outputs=[self.PROBABILITY_OUTPUT])
     if as_iterable:
-      return (p[Classifier.PROBABILITY_OUTPUT] for p in predictions)
+      return (p[self.PROBABILITY_OUTPUT] for p in predictions)
     else:
-      return predictions[Classifier.PROBABILITY_OUTPUT]
+      return predictions[self.PROBABILITY_OUTPUT]
 
   def _classifier_model(self, features, targets, mode):
-    return self._convert_to_estimator_model_result(
-        self._logits_fn(features, targets, mode))
-
-  def _classifier_model_with_params(self, features, targets, mode, params):
-    return self._convert_to_estimator_model_result(
-        self._logits_fn(features, targets, mode, params))
-
-  def _convert_to_estimator_model_result(self, logits_fn_result):
-    logits, loss, train_op = logits_fn_result
+    logits, loss, train_op = self._logits_fn(features, targets, mode)
     return {
-        Classifier.CLASS_OUTPUT:
-            math_ops.argmax(logits, len(logits.get_shape()) - 1),
-        Classifier.PROBABILITY_OUTPUT: nn.softmax(logits)
+        'classes': math_ops.argmax(logits, len(logits.get_shape()) - 1),
+        'probabilities': nn.softmax(logits)
     }, loss, train_op
+

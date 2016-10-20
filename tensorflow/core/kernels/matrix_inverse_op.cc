@@ -28,10 +28,10 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <class Scalar>
-class MatrixInverseOp : public LinearAlgebraOp<Scalar> {
+template <class Scalar, bool SupportsBatchOperation>
+class MatrixInverseOp : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
  public:
-  typedef LinearAlgebraOp<Scalar> Base;
+  typedef LinearAlgebraOp<Scalar, SupportsBatchOperation> Base;
 
   explicit MatrixInverseOp(OpKernelConstruction* context) : Base(context) {
     OP_REQUIRES_OK(context, context->GetAttr("adjoint", &adjoint_));
@@ -77,9 +77,10 @@ class MatrixInverseOp : public LinearAlgebraOp<Scalar> {
   TF_DISALLOW_COPY_AND_ASSIGN(MatrixInverseOp);
 };
 
-REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<float>), float);
-REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<double>), double);
-REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<float>), float);
-REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<double>), double);
+REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<float, false>), float);
+REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<double, false>), double);
+REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<float, true>), float);
+REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<double, true>),
+                   double);
 
 }  // namespace tensorflow

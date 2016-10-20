@@ -40,19 +40,3 @@ Write a string record to the file.
 Close the file.
 
 
-
-#### Other Methods
-- - -
-
-#### `tf.python_io.TFRecordWriter.__enter__()` {#TFRecordWriter.__enter__}
-
-Enter a `with` block.
-
-
-- - -
-
-#### `tf.python_io.TFRecordWriter.__exit__(unused_type, unused_value, unused_traceback)` {#TFRecordWriter.__exit__}
-
-Exit a `with` block, closing the file.
-
-

@@ -36,9 +36,6 @@ class RecordWriterOptions {
   enum CompressionType { NONE = 0, ZLIB_COMPRESSION = 1 };
   CompressionType compression_type = NONE;
 
-  static RecordWriterOptions CreateRecordWriterOptions(
-      const string& compression_type);
-
 // Options specific to zlib compression.
 #if !defined(IS_SLIM_BUILD)
   ZlibCompressionOptions zlib_options;

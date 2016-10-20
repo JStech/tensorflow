@@ -26,17 +26,13 @@ IRIS_TRAINING = "iris_training.csv"
 IRIS_TEST = "iris_test.csv"
 
 # Load datasets.
-training_set = tf.contrib.learn.datasets.base.load_csv_with_header(
-    filename=IRIS_TRAINING, target_dtype=np.int)
-test_set = tf.contrib.learn.datasets.base.load_csv_with_header(
-    filename=IRIS_TEST, target_dtype=np.int)
-
-# Specify that all features have real-value data
-feature_columns = [tf.contrib.layers.real_valued_column("", dimension=4)]
+training_set = tf.contrib.learn.datasets.base.load_csv(filename=IRIS_TRAINING,
+                                                       target_dtype=np.int)
+test_set = tf.contrib.learn.datasets.base.load_csv(filename=IRIS_TEST,
+                                                   target_dtype=np.int)
 
 # Build 3 layer DNN with 10, 20, 10 units respectively.
-classifier = tf.contrib.learn.DNNClassifier(feature_columns=feature_columns,
-                                            hidden_units=[10, 20, 10],
+classifier = tf.contrib.learn.DNNClassifier(hidden_units=[10, 20, 10],
                                             n_classes=3,
                                             model_dir="/tmp/iris_model")
 
@@ -57,14 +53,14 @@ y = classifier.predict(new_samples)
 print('Predictions: {}'.format(str(y)))
 ```
 
-Copy the above code into a file, and download the corresponding
-[training](http://download.tensorflow.org/data/iris_training.csv) and
-[test](http://download.tensorflow.org/data/iris_test.csv) data sets to the same
+Copy the above code into a file, and download the corresponding [training]
+(http://download.tensorflow.org/data/iris_training.csv) and [test]
+(http://download.tensorflow.org/data/iris_test.csv) data sets to the same
 directory.
 
 In the following sections, you'll progressively make updates to the above code
 to add logging and monitoring capabilities. Final code incorporating all updates
-is [available for download here](https://www.tensorflow.org/code/tensorflow/examples/tutorials/monitors/iris_monitors.py).
+is [available for download here](../../../examples/tutorials/monitors/iris_monitors.py).
 
 ## Overview
 
@@ -73,7 +69,7 @@ walked through how to implement a neural net classifier to categorize Iris
 examples into one of three species.
 
 But when [the code](#setup) from this tutorial is run, the output contains no
-logging tracking how model training is progressing&mdash;only the results
+logging tracking how model training is progressing&mdash;only the results 
 of the `print` statements that were included:
 
 ```none
@@ -90,12 +86,11 @@ appropriate.
 One way to address this problem would be to split model training into multiple
 `fit` calls with smaller numbers of steps in order to evaluate accuracy more
 progressively. However, this is not recommended practice, as it greatly slows down model
-training. Fortunately, tf.contrib.learn offers another solution: a
-[Monitor API](../../api_docs/python/contrib.learn.monitors.md)designed to help
-you log metrics and evaluate your model while training is in progress. In the
-following sections, you'll learn how to enable logging in TensorFlow, set up a
-ValidationMonitor to do streaming evaluations, and visualize your metrics using
-TensorBoard.
+training. Fortunately, tf.contrib.learn offers another solution: a [Monitor API]
+(../../api_docs/python/contrib.learn.monitors.md) designed to help you log metrics
+and evaluate your model while training is in progress. In the following sections,
+you'll learn how to enable logging in TensorFlow, set up a ValidationMonitor to do
+streaming evaluations, and visualize your metrics using TensorBoard.
 
 ## Enabling Logging with TensorFlow
 
@@ -179,7 +174,8 @@ Place this code right before the line instantiating the `classifier`.
 
 `ValidationMonitor`s rely on saved checkpoints to perform evaluation operations,
 so you'll want to modify instantiation of the `classifier` to add a
-[`RunConfig`](../../api_docs/python/contrib.learn.md#RunConfig)
+[`RunConfig`]
+(../../api_docs/python/contrib.learn.md#RunConfig)
 that includes `save_checkpoints_secs`, which specifies how many seconds should
 elapse between checkpoint saves during training. Because the Iris data set is
 quite small, and thus trains quickly, it makes sense to set
@@ -187,8 +183,7 @@ quite small, and thus trains quickly, it makes sense to set
 sufficient number of checkpoints:
 
 ```python
-classifier = tf.contrib.learn.DNNClassifier(feature_columns=feature_columns,
-                                            hidden_units=[10, 20, 10],
+classifier = tf.contrib.learn.DNNClassifier(hidden_units=[10, 20, 10],
                                             n_classes=3,
                                             model_dir="/tmp/iris_model",
                                             config=tf.contrib.learn.RunConfig(
@@ -255,7 +250,7 @@ validation_monitor = tf.contrib.learn.monitors.ValidationMonitor(
     metrics=validation_metrics)
 ```
 
-Rerun the code, and you should see precision and recall included in your
+Rerun the code again, and you should see precision and recall included in your
 log output, e.g.:
 
 ```none
@@ -270,8 +265,8 @@ INFO:tensorflow:Validation (step 1600): recall = 1.0, accuracy = 0.966667, globa
 
 Note that in the above log output, by step 150, the model has already achieved
 precision and recall rates of 1.0. This raises the question as to whether model
-training could benefit from
-[early stopping](https://en.wikipedia.org/wiki/Early_stopping).
+training could benefit from [early stopping]
+(https://en.wikipedia.org/wiki/Early_stopping).
 
 In addition to logging eval metrics, `ValidationMonitor`s make it easy to
 implement early stopping when specified conditions are met, via three params:
@@ -295,7 +290,7 @@ implement early stopping when specified conditions are met, via three params:
 :                                  : `early_stopping_metric_minimize` is       :
 :                                  : `True`) or increase (if                   :
 :                                  : `early_stopping_metric_minimize` is       :
-:                                  : `False`), training will be stopped. Default :
+:                                  : False), training will be stopped. Default :
 :                                  : is `None`, which means early stopping     :
 :                                  : will never occur.                         :
 
@@ -347,8 +342,9 @@ Then load the provided URL (here, `http://0.0.0.0:6006`) in your browser. If you
 click on the accuracy field, you'll see an image like the following, which shows
 accuracy plotted against step count:
 
-![Accuracy over step count in TensorBoard](../../images/validation_monitor_tensorboard_accuracy.png "Accuracy over step count in TensorBoard")
+![Accuracy over step count in TensorBoard]
+(../../images/validation_monitor_tensorboard_accuracy.png "Accuracy over step count in TensorBoard")
 
-For more on using TensorBoard, see
-[TensorBoard: Visualizing Learning](../../how_tos/summaries_and_tensorboard/index.md)
+For more on using TensorBoard, see [TensorBoard: Visualizing Learning]
+(../../how_tos/summaries_and_tensorboard/index.md)
 and [TensorBoard: Graph Visualization](../../how_tos/graph_viz/index.md).

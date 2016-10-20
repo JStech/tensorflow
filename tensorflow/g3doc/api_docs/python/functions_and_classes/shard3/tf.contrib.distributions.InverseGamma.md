@@ -20,7 +20,7 @@ dist2 = InverseGamma(alpha=[3.0, 4.0], beta=[2.0, 3.0])
 ```
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.__init__(alpha, beta, validate_args=False, allow_nan_stats=True, name='InverseGamma')` {#InverseGamma.__init__}
+#### `tf.contrib.distributions.InverseGamma.__init__(alpha, beta, validate_args=True, allow_nan_stats=False, name='InverseGamma')` {#InverseGamma.__init__}
 
 Construct InverseGamma distributions with parameters `alpha` and `beta`.
 
@@ -35,11 +35,10 @@ broadcasting (e.g. `alpha + beta` is a valid operation).
     alpha must contain only positive values.
 *  <b>`beta`</b>: Floating point tensor, the scale params of the distribution(s).
     beta must contain only positive values.
-*  <b>`validate_args`</b>: `Boolean`, default `False`.  Whether to assert that
-    `a > 0`, `b > 0`, and that `x > 0` in the methods `prob(x)` and
-    `log_prob(x)`.  If `validate_args` is `False` and the inputs are
-    invalid, correct behavior is not guaranteed.
-*  <b>`allow_nan_stats`</b>: `Boolean`, default `True`.  If `False`, raise an
+*  <b>`validate_args`</b>: Whether to assert that `a > 0, b > 0`, and that `x > 0` in
+    the methods `prob(x)` and `log_prob(x)`.  If `validate_args` is `False`
+    and the inputs are invalid, correct behavior is not guaranteed.
+*  <b>`allow_nan_stats`</b>: Boolean, default `False`.  If `False`, raise an
     exception if a statistic (e.g. mean/mode/etc...) is undefined for any
     batch member.  If `True`, batch members with valid parameters leading to
     undefined statistics will return NaN for this statistic.
@@ -55,21 +54,7 @@ broadcasting (e.g. `alpha + beta` is a valid operation).
 
 #### `tf.contrib.distributions.InverseGamma.allow_nan_stats` {#InverseGamma.allow_nan_stats}
 
-Python boolean describing behavior when a stat is undefined.
-
-Stats return +/- infinity when it makes sense.  E.g., the variance
-of a Cauchy distribution is infinity.  However, sometimes the
-statistic is undefined, e.g., if a distribution's pdf does not achieve a
-maximum within the support of the distribution, the mode is undefined.
-If the mean is undefined, then by definition the variance is undefined.
-E.g. the mean for Student's T for df = 1 is undefined (no clear way to say
-it is either + or - infinity), so the variance = E[(X - mean)^2] is also
-undefined.
-
-##### Returns:
-
-
-*  <b>`allow_nan_stats`</b>: Python boolean.
+Boolean describing behavior when a stat is undefined for batch member.
 
 
 - - -
@@ -83,7 +68,7 @@ Shape parameter.
 
 #### `tf.contrib.distributions.InverseGamma.batch_shape(name='batch_shape')` {#InverseGamma.batch_shape}
 
-Shape of a single sample from a single event index as a 1-D `Tensor`.
+Batch dimensions of this instance as a 1-D int32 `Tensor`.
 
 The product of the dimensions of the `batch_shape` is the number of
 independent distributions of this kind the instance represents.
@@ -95,8 +80,7 @@ independent distributions of this kind the instance represents.
 
 ##### Returns:
 
-
-*  <b>`batch_shape`</b>: `Tensor`.
+  `Tensor` `batch_shape`
 
 
 - - -
@@ -108,60 +92,60 @@ Scale parameter.
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.cdf(value, name='cdf', **condition_kwargs)` {#InverseGamma.cdf}
+#### `tf.contrib.distributions.InverseGamma.cdf(x, name='cdf')` {#InverseGamma.cdf}
 
-Cumulative distribution function.
-
-Given random variable `X`, the cumulative distribution function `cdf` is:
-
-```
-cdf(x) := P[X <= x]
-```
+CDF of observations `x` under these InverseGamma distribution(s).
 
 ##### Args:
 
 
-*  <b>`value`</b>: `float` or `double` `Tensor`.
+*  <b>`x`</b>: tensor of dtype `dtype`, must be broadcastable with `alpha` and `beta`.
 *  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 ##### Returns:
 
 
-*  <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+*  <b>`cdf`</b>: tensor of dtype `dtype`, the CDFs of `x`.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.dtype` {#InverseGamma.dtype}
 
-The `DType` of `Tensor`s handled by this `Distribution`.
+dtype of samples from this distribution.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.entropy(name='entropy')` {#InverseGamma.entropy}
 
-Shannon entropy in nats.
-
-Additional documentation from `InverseGamma`:
+The entropy of these InverseGamma distribution(s).
 
 This is defined to be
 
 ```
 entropy = alpha - log(beta) + log(Gamma(alpha))
-+ (1-alpha)digamma(alpha)
+             + (1-alpha)digamma(alpha)
 ```
 
 where digamma(alpha) is the digamma function.
+
+##### Args:
+
+
+*  <b>`name`</b>: The name to give this op.
+
+##### Returns:
+
+
+*  <b>`entropy`</b>: tensor of dtype `dtype`, the entropy.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.event_shape(name='event_shape')` {#InverseGamma.event_shape}
 
-Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
+Shape of a sample from a single distribution as a 1-D int32 `Tensor`.
 
 ##### Args:
 
@@ -170,36 +154,90 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
 ##### Returns:
 
+  `Tensor` `event_shape`
 
-*  <b>`event_shape`</b>: `Tensor`.
+
+- - -
+
+#### `tf.contrib.distributions.InverseGamma.from_params(cls, make_safe=True, **kwargs)` {#InverseGamma.from_params}
+
+Given (unconstrained) parameters, return an instantiated distribution.
+
+Subclasses should implement a static method `_safe_transforms` that returns
+a dict of parameter transforms, which will be used if `make_safe = True`.
+
+Example usage:
+
+```
+# Let's say we want a sample of size (batch_size, 10)
+shapes = MultiVariateNormalDiag.param_shapes([batch_size, 10])
+
+# shapes has a Tensor shape for mu and sigma
+# shapes == {
+#   'mu': tf.constant([batch_size, 10]),
+#   'sigma': tf.constant([batch_size, 10]),
+# }
+
+# Here we parameterize mu and sigma with the output of a linear
+# layer. Note that sigma is unconstrained.
+params = {}
+for name, shape in shapes.items():
+  params[name] = linear(x, shape[1])
+
+# Note that you can forward other kwargs to the `Distribution`, like
+# `allow_nan_stats` or `name`.
+mvn = MultiVariateNormalDiag.from_params(**params, allow_nan_stats=True)
+```
+
+Distribution parameters may have constraints (e.g. `sigma` must be positive
+for a `Normal` distribution) and the `from_params` method will apply default
+parameter transforms. If a user wants to use their own transform, they can
+apply it externally and set `make_safe=False`.
+
+##### Args:
+
+
+*  <b>`make_safe`</b>: Whether the `params` should be constrained. If True,
+    `from_params` will apply default parameter transforms. If False, no
+    parameter transforms will be applied.
+*  <b>`**kwargs`</b>: dict of parameters for the distribution.
+
+##### Returns:
+
+  A distribution parameterized by possibly transformed parameters in
+  `kwargs`.
+
+##### Raises:
+
+
+*  <b>`TypeError`</b>: if `make_safe` is `True` but `_safe_transforms` is not
+    implemented directly for `cls`.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.get_batch_shape()` {#InverseGamma.get_batch_shape}
 
-Shape of a single sample from a single event index as a `TensorShape`.
+`TensorShape` available at graph construction time.
 
 Same meaning as `batch_shape`. May be only partially defined.
 
 ##### Returns:
 
-
-*  <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
+  `TensorShape` object.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.get_event_shape()` {#InverseGamma.get_event_shape}
 
-Shape of a single sample from a single batch as a `TensorShape`.
+`TensorShape` available at graph construction time.
 
 Same meaning as `event_shape`. May be only partially defined.
 
 ##### Returns:
 
-
-*  <b>`event_shape`</b>: `TensorShape`, possibly unknown.
+  `TensorShape` object.
 
 
 - - -
@@ -218,163 +256,102 @@ Same meaning as `event_shape`. May be only partially defined.
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.log_cdf(value, name='log_cdf', **condition_kwargs)` {#InverseGamma.log_cdf}
+#### `tf.contrib.distributions.InverseGamma.log_cdf(x, name='log_cdf')` {#InverseGamma.log_cdf}
 
-Log cumulative distribution function.
-
-Given random variable `X`, the cumulative distribution function `cdf` is:
-
-```
-log_cdf(x) := Log[ P[X <= x] ]
-```
-
-Often, a numerical approximation can be used for `log_cdf(x)` that yields
-a more accurate answer than simply taking the logarithm of the `cdf` when
-`x << -1`.
+Log CDF of observations `x` under these InverseGamma distribution(s).
 
 ##### Args:
 
 
-*  <b>`value`</b>: `float` or `double` `Tensor`.
+*  <b>`x`</b>: tensor of dtype `dtype`, must be broadcastable with `alpha` and `beta`.
 *  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 ##### Returns:
 
 
-*  <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+*  <b>`log_cdf`</b>: tensor of dtype `dtype`, the log-CDFs of `x`.
 
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.log_pdf(value, name='log_pdf', **condition_kwargs)` {#InverseGamma.log_pdf}
+#### `tf.contrib.distributions.InverseGamma.log_pdf(value, name='log_pdf')` {#InverseGamma.log_pdf}
 
-Log probability density function.
+Log of the probability density function.
+
+
+- - -
+
+#### `tf.contrib.distributions.InverseGamma.log_pmf(value, name='log_pmf')` {#InverseGamma.log_pmf}
+
+Log of the probability mass function.
+
+
+- - -
+
+#### `tf.contrib.distributions.InverseGamma.log_prob(x, name='log_prob')` {#InverseGamma.log_prob}
+
+Log prob of observations in `x` under these InverseGamma distribution(s).
 
 ##### Args:
 
 
-*  <b>`value`</b>: `float` or `double` `Tensor`.
+*  <b>`x`</b>: tensor of dtype `dtype`, must be broadcastable with `alpha` and `beta`.
 *  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 ##### Returns:
 
 
-*  <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+*  <b>`log_prob`</b>: tensor of dtype `dtype`, the log-PDFs of `x`.
 
 ##### Raises:
 
 
-*  <b>`TypeError`</b>: if not `is_continuous`.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.log_pmf(value, name='log_pmf', **condition_kwargs)` {#InverseGamma.log_pmf}
-
-Log probability mass function.
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-
-*  <b>`log_pmf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
-
-##### Raises:
-
-
-*  <b>`TypeError`</b>: if `is_continuous`.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.log_prob(value, name='log_prob', **condition_kwargs)` {#InverseGamma.log_prob}
-
-Log probability density/mass function (depending on `is_continuous`).
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-
-*  <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.log_survival_function(value, name='log_survival_function', **condition_kwargs)` {#InverseGamma.log_survival_function}
-
-Log survival function.
-
-Given random variable `X`, the survival function is defined:
-
-```
-log_survival_function(x) = Log[ P[X > x] ]
-                         = Log[ 1 - P[X <= x] ]
-                         = Log[ 1 - cdf(x) ]
-```
-
-Typically, different numerical approximations can be used for the log
-survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-  `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
-    `self.dtype`.
+*  <b>`TypeError`</b>: if `x` and `alpha` are different dtypes.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.mean(name='mean')` {#InverseGamma.mean}
 
-Mean.
-
-Additional documentation from `InverseGamma`:
+Mean of each batch member.
 
 The mean of an inverse gamma distribution is `beta / (alpha - 1)`,
 when `alpha > 1`, and `NaN` otherwise.  If `self.allow_nan_stats` is
 `False`, an exception will be raised rather than returning `NaN`
+
+##### Args:
+
+
+*  <b>`name`</b>: A name to give this op.
+
+##### Returns:
+
+  The mean for every batch member, a `Tensor` with same `dtype` as self.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.mode(name='mode')` {#InverseGamma.mode}
 
-Mode.
-
-Additional documentation from `InverseGamma`:
+Mode of each batch member.
 
 The mode of an inverse gamma distribution is `beta / (alpha + 1)`.
+
+##### Args:
+
+
+*  <b>`name`</b>: A name to give this op.
+
+##### Returns:
+
+  The mode for every batch member, a `Tensor` with same `dtype` as self.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.name` {#InverseGamma.name}
 
-Name prepended to all ops created by this `Distribution`.
+Name to prepend to all ops.
 
 
 - - -
@@ -421,186 +398,118 @@ param_shapes with static (i.e. TensorShape) shapes.
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.parameters` {#InverseGamma.parameters}
+#### `tf.contrib.distributions.InverseGamma.pdf(value, name='pdf')` {#InverseGamma.pdf}
 
-Dictionary of parameters used by this `Distribution`.
+The probability density function.
 
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.pdf(value, name='pdf', **condition_kwargs)` {#InverseGamma.pdf}
+#### `tf.contrib.distributions.InverseGamma.pmf(value, name='pmf')` {#InverseGamma.pmf}
 
-Probability density function.
+The probability mass function.
+
+
+- - -
+
+#### `tf.contrib.distributions.InverseGamma.prob(x, name='prob')` {#InverseGamma.prob}
+
+Pdf of observations in `x` under these Gamma distribution(s).
 
 ##### Args:
 
 
-*  <b>`value`</b>: `float` or `double` `Tensor`.
+*  <b>`x`</b>: tensor of dtype `dtype`, must be broadcastable with `alpha` and `beta`.
 *  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 ##### Returns:
 
 
-*  <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+*  <b>`prob`</b>: tensor of dtype `dtype`, the PDFs of `x`
 
 ##### Raises:
 
 
-*  <b>`TypeError`</b>: if not `is_continuous`.
+*  <b>`TypeError`</b>: if `x` and `alpha` are different dtypes.
 
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.pmf(value, name='pmf', **condition_kwargs)` {#InverseGamma.pmf}
+#### `tf.contrib.distributions.InverseGamma.sample(sample_shape=(), seed=None, name='sample')` {#InverseGamma.sample}
 
-Probability mass function.
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-
-*  <b>`pmf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
-
-##### Raises:
-
-
-*  <b>`TypeError`</b>: if `is_continuous`.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.prob(value, name='prob', **condition_kwargs)` {#InverseGamma.prob}
-
-Probability density/mass function (depending on `is_continuous`).
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-
-*  <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.sample(sample_shape=(), seed=None, name='sample', **condition_kwargs)` {#InverseGamma.sample}
-
-Generate samples of the specified shape.
+Generate samples of the specified shape for each batched distribution.
 
 Note that a call to `sample()` without arguments will generate a single
-sample.
+sample per batched distribution.
 
 ##### Args:
 
 
-*  <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
+*  <b>`sample_shape`</b>: Rank 1 `int32` `Tensor`. Shape of the generated samples.
 *  <b>`seed`</b>: Python integer seed for RNG
 *  <b>`name`</b>: name to give to the op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 ##### Returns:
 
 
-*  <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
+*  <b>`samples`</b>: a `Tensor` of dtype `self.dtype` and shape
+      `sample_shape + self.batch_shape + self.event_shape`.
 
 
 - - -
 
-#### `tf.contrib.distributions.InverseGamma.sample_n(n, seed=None, name='sample_n', **condition_kwargs)` {#InverseGamma.sample_n}
+#### `tf.contrib.distributions.InverseGamma.sample_n(n, seed=None, name='sample_n')` {#InverseGamma.sample_n}
 
-Generate `n` samples.
+Draws `n` samples from these InverseGamma distribution(s).
 
-
-Additional documentation from `InverseGamma`:
-
-See the documentation for tf.random_gamma for more details.
+See the doc for tf.random_gamma for further details on sampling strategy.
 
 ##### Args:
 
 
-*  <b>`n`</b>: `Scalar` `Tensor` of type `int32` or `int64`, the number of
-    observations to sample.
-*  <b>`seed`</b>: Python integer seed for RNG
-*  <b>`name`</b>: name to give to the op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
+*  <b>`n`</b>: Python integer, the number of observations to sample from each
+    distribution.
+*  <b>`seed`</b>: Python integer, the random seed for this operation.
+*  <b>`name`</b>: Optional name for the operation.
 
 ##### Returns:
 
 
-*  <b>`samples`</b>: a `Tensor` with a prepended dimension (n,).
-
-##### Raises:
-
-
-*  <b>`TypeError`</b>: if `n` is not an integer type.
+*  <b>`samples`</b>: a `Tensor` of shape `(n,) + self.batch_shape + self.event_shape`
+      with values of type `self.dtype`.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.std(name='std')` {#InverseGamma.std}
 
-Standard deviation.
-
-
-- - -
-
-#### `tf.contrib.distributions.InverseGamma.survival_function(value, name='survival_function', **condition_kwargs)` {#InverseGamma.survival_function}
-
-Survival function.
-
-Given random variable `X`, the survival function is defined:
-
-```
-survival_function(x) = P[X > x]
-                     = 1 - P[X <= x]
-                     = 1 - cdf(x).
-```
-
-##### Args:
-
-
-*  <b>`value`</b>: `float` or `double` `Tensor`.
-*  <b>`name`</b>: The name to give this op.
-*  <b>`**condition_kwargs`</b>: Named arguments forwarded to subclass implementation.
-
-##### Returns:
-
-  Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
-    `self.dtype`.
+Standard deviation of the distribution.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.validate_args` {#InverseGamma.validate_args}
 
-Python boolean indicated possibly expensive checks are enabled.
+Boolean describing behavior on invalid input.
 
 
 - - -
 
 #### `tf.contrib.distributions.InverseGamma.variance(name='variance')` {#InverseGamma.variance}
 
-Variance.
-
-Additional documentation from `InverseGamma`:
+Variance of each batch member.
 
 Variance for inverse gamma is defined only for `alpha > 2`. If
 `self.allow_nan_stats` is `False`, an exception will be raised rather
 than returning `NaN`.
+
+##### Args:
+
+
+*  <b>`name`</b>: A name to give this op.
+
+##### Returns:
+
+  The variance for every batch member, a `Tensor` with same `dtype` as self.
 
 

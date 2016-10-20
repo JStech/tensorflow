@@ -11,14 +11,6 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-load(
-    "//tensorflow:tensorflow.bzl",
-    "if_android",
-    "if_ios",
-    "if_mobile",
-    "if_not_mobile",
-)
-
 filegroup(
     name = "all_files",
     srcs = glob(
@@ -106,11 +98,16 @@ filegroup(
 
 cc_library(
     name = "session_bundle",
+    srcs = ["session_bundle.cc"],
     hdrs = ["session_bundle.h"],
-    visibility = ["//visibility:public"],
     deps = [
-        ":session_bundle_lite",
+        ":manifest_proto_cc",
         ":signature",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:tensorflow_opensource",
     ],
 )
 
@@ -121,19 +118,15 @@ cc_library(
     name = "session_bundle_lite",
     srcs = ["session_bundle.cc"],
     hdrs = ["session_bundle.h"],
-    copts = if_ios(["-DGOOGLE_LOGGING"]),
     visibility = ["//visibility:public"],
     deps = [
-        ":signature_lite",
-    ] + if_not_mobile([
         ":manifest_proto_cc",
+        ":signature_lite",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:protos_all_cc",
-        "//tensorflow/core/util/tensor_bundle:naming",
-        # mobile not supported yet
-    ]),
+    ],
 )
 
 cc_test(
@@ -191,6 +184,19 @@ py_test(
     ],
 )
 
+cc_library(
+    name = "signature",
+    srcs = ["signature.cc"],
+    hdrs = ["signature.h"],
+    deps = [
+        ":manifest_proto_cc",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:tensorflow_opensource",
+    ],
+)
+
 # This is a lite version of the signature target that does not link in any
 # Tensorflow ops in order to minimize its size. Clients using this should
 # link any required ops manually.
@@ -199,24 +205,12 @@ cc_library(
     srcs = ["signature.cc"],
     hdrs = ["signature.h"],
     visibility = ["//visibility:public"],
-    deps = if_not_mobile([
+    deps = [
         ":manifest_proto_cc",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
-        # mobile not supported yet
-    ]),
-)
-
-cc_library(
-    name = "signature",
-    hdrs = ["signature.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":signature_lite",
-    ] + if_not_mobile([
-        "//tensorflow/core:tensorflow_opensource",
-    ]),
+    ],
 )
 
 cc_test(
@@ -254,71 +248,9 @@ cc_library(
 
 load("//tensorflow/core:platform/default/build_config.bzl", "tf_proto_library")
 
-filegroup(
-    name = "saved_model_half_plus_two",
-    srcs = glob([
-        "testdata/saved_model_half_plus_two/**",
-    ]),
-)
-
-cc_library(
-    name = "bundle_shim",
-    srcs = ["bundle_shim.cc"],
-    hdrs = ["bundle_shim.h"],
-    copts = if_ios(["-DGOOGLE_LOGGING"]),
-    visibility = ["//visibility:private"],
-    deps = [
-        ":bundle_shim_constants",
-        ":session_bundle",
-        ":signature",
-        "//tensorflow/cc/saved_model:loader",
-        "//tensorflow/cc/saved_model:signature_constants",
-    ] + if_not_mobile([
-        ":manifest_proto_cc",
-        "//tensorflow/core:core_cpu",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:lib",
-        "//tensorflow/core:protos_all_cc",
-        # mobile not supported yet
-    ]),
-)
-
-cc_test(
-    name = "bundle_shim_test",
-    size = "small",
-    srcs = ["bundle_shim_test.cc"],
-    data = [
-        ":saved_model_half_plus_two",
-        "//tensorflow/cc/saved_model:signature_constants",
-        "//tensorflow/contrib/session_bundle/example:half_plus_two",
-    ],
-    # Link in all registered kernels.
-    linkstatic = 1,
-    deps = [
-        ":bundle_shim",
-        ":bundle_shim_constants",
-        ":test_util",
-        "//tensorflow/cc/saved_model:loader",
-        "//tensorflow/core:core_cpu",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:lib",
-        "//tensorflow/core:test",
-        "//tensorflow/core:test_main",
-        "//tensorflow/core:testlib",
-    ],
-)
-
-cc_library(
-    name = "bundle_shim_constants",
-    hdrs = ["bundle_shim_constants.h"],
-)
-
 tf_proto_library(
     name = "manifest_proto",
     srcs = ["manifest.proto"],
     cc_api_version = 2,
     visibility = ["//visibility:public"],
 )
-
-# -----------------------------------------------------------------------------
-# Google-internal targets go here (must be at the end).

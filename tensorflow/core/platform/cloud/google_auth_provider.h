@@ -19,8 +19,6 @@ limitations under the License.
 #include <memory>
 #include "tensorflow/core/platform/cloud/auth_provider.h"
 #include "tensorflow/core/platform/cloud/oauth_client.h"
-#include "tensorflow/core/platform/mutex.h"
-#include "tensorflow/core/platform/thread_annotations.h"
 
 namespace tensorflow {
 
@@ -33,9 +31,7 @@ class GoogleAuthProvider : public AuthProvider {
       std::unique_ptr<HttpRequest::Factory> http_request_factory, Env* env);
   virtual ~GoogleAuthProvider() {}
 
-  /// \brief Returns the short-term authentication bearer token.
-  ///
-  /// Safe for concurrent use by multiple threads.
+  /// Returns the short-term authentication bearer token.
   Status GetToken(string* token) override;
 
  private:
@@ -51,9 +47,8 @@ class GoogleAuthProvider : public AuthProvider {
   std::unique_ptr<OAuthClient> oauth_client_;
   std::unique_ptr<HttpRequest::Factory> http_request_factory_;
   Env* env_;
-  mutex mu_;
-  string current_token_ GUARDED_BY(mu_);
-  uint64 expiration_timestamp_sec_ GUARDED_BY(mu_) = 0;
+  string current_token_;
+  uint64 expiration_timestamp_sec_ = 0;
   TF_DISALLOW_COPY_AND_ASSIGN(GoogleAuthProvider);
 };
 

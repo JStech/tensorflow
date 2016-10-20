@@ -19,59 +19,58 @@ limitations under the License.
 
 namespace tensorflow {
 
-using shape_inference::DimensionHandle;
+using shape_inference::Dimension;
 using shape_inference::InferenceContext;
-using shape_inference::ShapeHandle;
+using shape_inference::Shape;
 
 namespace {
 
 // Sets output[0] to shape [batch_dim,height,width,channel_dim], where
 // height and width come from the size_tensor.
-Status SetOutputToSizedImage(InferenceContext* c, DimensionHandle batch_dim,
-                             int size_input_idx, DimensionHandle channel_dim) {
+Status SetOutputToSizedImage(InferenceContext* c, const Dimension* batch_dim,
+                             int size_input_idx, const Dimension* channel_dim) {
   // Verify shape of size input.
-  ShapeHandle size;
+  const Shape* size;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(size_input_idx), 1, &size));
-  DimensionHandle unused;
+  const Dimension* unused;
   TF_RETURN_IF_ERROR(c->WithValue(c->Dim(size, 0), 2, &unused));
 
   // Get size values from the size tensor.
   const Tensor* size_tensor = c->input_tensor(size_input_idx);
-  DimensionHandle width;
-  DimensionHandle height;
+  const Dimension* width;
+  const Dimension* height;
   if (size_tensor == nullptr) {
     width = c->UnknownDim();
     height = c->UnknownDim();
   } else {
-    auto vec = size_tensor->vec<int32>();
-    height = c->MakeDim(vec(0));
-    width = c->MakeDim(vec(1));
+    height = c->MakeDim(size_tensor->flat<int32>()(0));
+    width = c->MakeDim(size_tensor->flat<int32>()(1));
   }
   c->set_output(0, c->MakeShape({batch_dim, height, width, channel_dim}));
   return Status::OK();
 }
 
 Status ResizeShapeFn(InferenceContext* c) {
-  ShapeHandle input;
+  const Shape* input;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &input));
   return SetOutputToSizedImage(c, c->Dim(input, 0), 1 /* size_input_idx */,
                                c->Dim(input, 3));
 }
 
 Status DecodeImageShapeFn(InferenceContext* c) {
-  ShapeHandle unused;
+  const Shape* unused;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 0, &unused));
-  DimensionHandle channels_dim;
+  const Dimension* channels_dim;
   int32 channels;
-  TF_RETURN_IF_ERROR(c->GetAttr("channels", &channels));
-  if (channels == 0) {
-    channels_dim = c->UnknownDim();
-  } else {
+  Status s = c->GetAttr("channels", &channels);
+  if (s.ok()) {
     if (channels < 0) {
       return errors::InvalidArgument("channels must be non-negative, got ",
                                      channels);
     }
     channels_dim = c->MakeDim(channels);
+  } else {
+    channels_dim = c->UnknownDim();
   }
 
   c->set_output(0, c->MakeShape({InferenceContext::kUnknownDim,
@@ -80,20 +79,20 @@ Status DecodeImageShapeFn(InferenceContext* c) {
 }
 
 Status EncodeImageShapeFn(InferenceContext* c) {
-  ShapeHandle unused;
+  const Shape* unused;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 3, &unused));
   c->set_output(0, c->Scalar());
   return Status::OK();
 }
 
 Status ColorspaceShapeFn(InferenceContext* c) {
-  ShapeHandle input;
+  const Shape* input;
   TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), 1, &input));
 
   // The last dimension value is always 3.
-  DimensionHandle last_dim;
+  const Dimension* last_dim;
   TF_RETURN_IF_ERROR(c->WithValue(c->Dim(input, -1), 3, &last_dim));
-  ShapeHandle out;
+  const Shape* out;
   TF_RETURN_IF_ERROR(c->ReplaceDim(input, -1, last_dim, &out));
   c->set_output(0, out);
 
@@ -225,10 +224,10 @@ REGISTER_OP("ResizeNearestNeighborGrad")
     .Attr("T: {uint8, int8, int32, half, float, double}")
     .Attr("align_corners: bool = false")
     .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle input;
+      const Shape* input;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &input));
-      ShapeHandle unused;
-      DimensionHandle unused_dim;
+      const Shape* unused;
+      const Dimension* unused_dim;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 1, &unused));
       TF_RETURN_IF_ERROR(c->WithValue(c->Dim(unused, 0), 2, &unused_dim));
       const Tensor* size = c->input_tensor(1);
@@ -268,28 +267,6 @@ REGISTER_OP("RandomCrop")
     .Attr("seed2: int = 0")
     .SetIsStateful()
     .Deprecated(8, "Random crop is now pure Python")
-    .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle image;
-      TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 3, &image));
-      DimensionHandle channels = c->Dim(image, -1);
-
-      ShapeHandle unused;
-      TF_RETURN_IF_ERROR(c->Merge(c->input(1), c->Vector(2), &unused));
-
-      const Tensor* size = c->input_tensor(1);
-      DimensionHandle h;
-      DimensionHandle w;
-      if (size == nullptr) {
-        h = c->UnknownDim();
-        w = c->UnknownDim();
-      } else {
-        auto size_vec = size->vec<int64>();
-        h = c->MakeDim(size_vec(0));
-        w = c->MakeDim(size_vec(1));
-      }
-      c->set_output(0, c->MakeShape({h, w, channels}));
-      return Status::OK();
-    })
     .Doc(R"doc(
 Randomly crop `image`.
 
@@ -499,14 +476,6 @@ contents: 0-D. PNG-encoded image.
 REGISTER_OP("DecodeGif")
     .Input("contents: string")
     .Output("image: uint8")
-    .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle unused;
-      TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 0, &unused));
-      c->set_output(0, c->MakeShape({InferenceContext::kUnknownDim,
-                                     InferenceContext::kUnknownDim,
-                                     InferenceContext::kUnknownDim, 3}));
-      return Status::OK();
-    })
     .Doc(R"doc(
 Decode the first frame of a GIF-encoded image to a uint8 tensor.
 
@@ -578,7 +547,7 @@ bounding box coordinates are floats in `[0.0, 1.0]` relative to the width and
 height of the underlying image.
 
 For example, if an image is 100 x 200 pixels and the bounding box is
-`[0.1, 0.2, 0.5, 0.9]`, the bottom-left and upper-right coordinates of the
+`[0.1, 0.5, 0.2, 0.9]`, the bottom-left and upper-right coordinates of the
 bounding box will be `(10, 40)` to `(50, 180)`.
 
 Parts of the bounding box may fall outside the image.
@@ -625,7 +594,7 @@ localization of an object, i.e. bounding box, given an `image_size`,
 The output of this Op is a single bounding box that may be used to crop the
 original image. The output is returned as 3 tensors: `begin`, `size` and
 `bboxes`. The first 2 tensors can be fed directly into `tf.slice` to crop the
-image. The latter may be supplied to `tf.image.draw_bounding_boxes` to visualize
+image. The latter may be supplied to `tf.image.draw_bounding_box` to visualize
 what the bounding box looks like.
 
 Bounding boxes are supplied and returned as `[y_min, x_min, y_max, x_max]`. The
@@ -634,7 +603,6 @@ height of the underlying image.
 
 For example,
 
-```python
     # Generate a single distorted bounding box.
     begin, size, bbox_for_draw = tf.image.sample_distorted_bounding_box(
         tf.shape(image),
@@ -647,7 +615,6 @@ For example,
 
     # Employ the bounding box to distort the image.
     distorted_image = tf.slice(image, begin, size)
-```
 
 Note that if no bounding box information is available, setting
 `use_image_if_no_bounding_boxes = true` will assume there is a single implicit
@@ -698,15 +665,15 @@ REGISTER_OP("ExtractGlimpse")
     .Attr("normalized: bool = true")
     .Attr("uniform_noise: bool = true")
     .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle input;
+      const Shape* input;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &input));
-      ShapeHandle offsets;
+      const Shape* offsets;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 2, &offsets));
 
-      DimensionHandle batch_dim;
+      const Dimension* batch_dim;
       TF_RETURN_IF_ERROR(
           c->Merge(c->Dim(input, 0), c->Dim(offsets, 0), &batch_dim));
-      DimensionHandle unused;
+      const Dimension* unused;
       TF_RETURN_IF_ERROR(c->WithValue(c->Dim(offsets, 1), 2, &unused));
 
       return SetOutputToSizedImage(c, batch_dim, 1 /* size_input_idx */,
@@ -751,7 +718,7 @@ centered: indicates if the offset coordinates are centered relative to
   upper left corner of the input images.
 normalized: indicates if the offset coordinates are normalized.
 uniform_noise: indicates if the noise should be generated using a
-  uniform distribution or a Gaussian distribution.
+  uniform distribution or a gaussian distribution.
 )doc");
 
 // --------------------------------------------------------------------------
@@ -767,20 +734,20 @@ REGISTER_OP("CropAndResize")
     .Attr("extrapolation_value: float = 0")
     .SetShapeFn([](InferenceContext* c) {
       // Get inputs and validate ranks.
-      ShapeHandle input;
+      const Shape* input;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &input));
-      ShapeHandle boxes;
+      const Shape* boxes;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 2, &boxes));
-      ShapeHandle box_ind;
+      const Shape* box_ind;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 1, &box_ind));
 
       // boxes[0] and box_ind[0] are both num_boxes.
-      DimensionHandle num_boxes_dim;
+      const Dimension* num_boxes_dim;
       TF_RETURN_IF_ERROR(
           c->Merge(c->Dim(boxes, 0), c->Dim(box_ind, 0), &num_boxes_dim));
 
       // boxes.dim(1) is 4.
-      DimensionHandle unused;
+      const Dimension* unused;
       TF_RETURN_IF_ERROR(c->WithValue(c->Dim(boxes, 1), 4, &unused));
 
       return SetOutputToSizedImage(c, num_boxes_dim, 3 /* size_input_idx */,
@@ -830,7 +797,7 @@ REGISTER_OP("CropAndResizeGradImage")
     .Attr("T: {float, half, double}")
     .Attr("method: {'bilinear'} = 'bilinear'")
     .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle out;
+      const Shape* out;
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(3, &out));
       TF_RETURN_IF_ERROR(c->WithRank(out, 4, &out));
       c->set_output(0, out);
@@ -922,7 +889,7 @@ system result in the same boxes being selected by the algorithm.
 The output of this operation is a set of integers indexing into the input
 collection of bounding boxes representing the selected boxes.  The bounding
 box coordinates corresponding to the selected indices can then be obtained
-using the `tf.gather operation`.  For example:
+using the tf.gather operation.  For example:
 
   selected_indices = tf.image.non_max_suppression(
       boxes, scores, max_output_size, iou_threshold)

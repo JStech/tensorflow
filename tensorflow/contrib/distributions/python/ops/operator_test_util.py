@@ -65,9 +65,9 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
     batch_shape = list(batch_shape)
     mat_shape = batch_shape + [k, k]
     # return operator, mat
-    raise NotImplementedError("Not implemented yet.")
+    raise NotImplementedError('Not implemented yet.')
 
-  def testToDense(self):
+  def test_to_dense(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:
@@ -78,7 +78,7 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
                 expected=mat,
                 actual=operator.to_dense())
 
-  def testSqrtToDense(self):
+  def test_sqrt_to_dense(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:
@@ -91,17 +91,17 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
               expected=mat,
               actual=tf.batch_matmul(sqrt, sqrt))
 
-  def testDeterminants(self):
+  def test_determinants(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:
           operator, mat = self._build_operator_and_mat(batch_shape, k)
-          expected_det = tf.matrix_determinant(mat).eval()
+          expected_det = tf.batch_matrix_determinant(mat).eval()
 
           self._compare_results(expected_det, operator.det())
           self._compare_results(np.log(expected_det), operator.log_det())
 
-  def testMatmul(self):
+  def test_matmul(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:
@@ -114,7 +114,7 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
               expected=tf.batch_matmul(mat, x).eval(),
               actual=operator.matmul(x))
 
-  def testSqrtMatmul(self):
+  def test_sqrt_matmul(self):
     # Square roots are not unique, but we should have SS^T x = Ax, and in our
     # case, we should have S = S^T, so SSx = Ax.
     with self.test_session():
@@ -129,7 +129,7 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
               expected=tf.batch_matmul(mat, x).eval(),
               actual=operator.sqrt_matmul(operator.sqrt_matmul(x)))
 
-  def testSolve(self):
+  def test_solve(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:
@@ -139,9 +139,10 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
           x = self._rng.randn(*(batch_shape + (k, 5)))
 
           self._compare_results(
-              expected=tf.matrix_solve(mat, x).eval(), actual=operator.solve(x))
+              expected=tf.batch_matrix_solve(mat, x).eval(),
+              actual=operator.solve(x))
 
-  def testSqrtSolve(self):
+  def test_sqrt_solve(self):
     # Square roots are not unique, but we should still have
     # S^{-T} S^{-1} x = A^{-1} x.
     # In our case, we should have S = S^T, so then S^{-1} S^{-1} x = A^{-1} x.
@@ -154,10 +155,10 @@ class OperatorPDDerivedClassTest(tf.test.TestCase):
           x = self._rng.randn(*(batch_shape + (k, 5)))
 
           self._compare_results(
-              expected=tf.matrix_solve(mat, x).eval(),
+              expected=tf.batch_matrix_solve(mat, x).eval(),
               actual=operator.sqrt_solve(operator.sqrt_solve(x)))
 
-  def testAddToTensor(self):
+  def test_add_to_tensor(self):
     with self.test_session():
       for batch_shape in [(), (2, 3,)]:
         for k in [1, 4]:

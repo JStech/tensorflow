@@ -8,9 +8,6 @@ exports_files(["LICENSE"])
 package(default_visibility = ["//tensorflow:__subpackages__"])
 
 load("//tensorflow:tensorflow.bzl", "cuda_py_test")
-load("//tensorflow:tensorflow.bzl", "tf_custom_op_library")
-load("//tensorflow:tensorflow.bzl", "tf_gen_op_wrapper_py")
-load("//tensorflow:tensorflow.bzl", "tf_gen_op_libs")
 
 py_library(
     name = "framework_py",
@@ -18,55 +15,17 @@ py_library(
         "__init__.py",
         "python/framework/__init__.py",
         "python/framework/checkpoint_utils.py",
-        "python/framework/decorator_utils.py",
         "python/framework/deprecation.py",
-        "python/framework/experimental.py",
         "python/framework/tensor_util.py",
         "python/ops/__init__.py",
         "python/ops/arg_scope.py",
+        "python/ops/embedding_ops.py",
         "python/ops/ops.py",
         "python/ops/prettyprint_ops.py",
+        "python/ops/sampling_ops.py",
         "python/ops/variables.py",
     ],
-    data = [
-        ":python/ops/_variable_ops.so",
-    ],
     srcs_version = "PY2AND3",
-    deps = [
-        ":gen_variable_ops",
-    ],
-)
-
-tf_custom_op_library(
-    name = "python/ops/_variable_ops.so",
-    srcs = [
-        "kernels/zero_initializer_op.cc",
-        "kernels/zero_initializer_op.h",
-        "ops/variable_ops.cc",
-    ],
-    gpu_srcs = [
-        "kernels/zero_initializer_op_gpu.cu.cc",
-        "kernels/zero_initializer_op.h",
-    ],
-)
-
-tf_gen_op_libs(
-    op_lib_names = ["variable_ops"],
-)
-
-cc_library(
-    name = "all_ops",
-    deps = [
-        ":variable_ops_op_lib",
-    ],
-)
-
-tf_gen_op_wrapper_py(
-    name = "gen_variable_ops",
-    out = "python/ops/gen_variable_ops.py",
-    deps = [
-        ":variable_ops_op_lib",
-    ],
 )
 
 py_test(
@@ -110,20 +69,6 @@ py_test(
 )
 
 py_test(
-    name = "decorator_utils_test",
-    srcs = ["python/framework/decorator_utils_test.py"],
-    srcs_version = "PY2AND3",
-    deps = ["//tensorflow:tensorflow_py"],
-)
-
-py_test(
-    name = "experimental_test",
-    srcs = ["python/framework/experimental_test.py"],
-    srcs_version = "PY2AND3",
-    deps = ["//tensorflow:tensorflow_py"],
-)
-
-py_test(
     name = "tensor_util_test",
     srcs = ["python/framework/tensor_util_test.py"],
     srcs_version = "PY2AND3",
@@ -135,6 +80,23 @@ py_test(
     size = "small",
     srcs = ["python/ops/variables_test.py"],
     srcs_version = "PY2AND3",
+    deps = ["//tensorflow:tensorflow_py"],
+)
+
+py_test(
+    name = "sampling_ops_test",
+    size = "small",
+    srcs = ["python/ops/sampling_ops_test.py"],
+    srcs_version = "PY2AND3",
+    deps = ["//tensorflow:tensorflow_py"],
+)
+
+py_test(
+    name = "sampling_ops_threading_test",
+    size = "small",
+    srcs = ["python/ops/sampling_ops_threading_test.py"],
+    srcs_version = "PY2AND3",
+    tags = ["notsan"],
     deps = ["//tensorflow:tensorflow_py"],
 )
 

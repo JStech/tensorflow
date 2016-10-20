@@ -1,4 +1,4 @@
-/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2015 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,15 +15,9 @@ limitations under the License.
 
 /* tslint:disable:no-namespace */
 module TF.Globals {
-  const PROJECTOR_LAUNCHED = false;
-
   // The names of TensorBoard tabs.
   export var TABS =
       ['events', 'images', 'audio', 'graphs', 'distributions', 'histograms'];
-
-  if (PROJECTOR_LAUNCHED) {
-    TABS.push('projections');
-  }
 
   // If true, TensorBoard stores its hash in the URI state.
   // If false, tab switching in TensorBoard will not update location hash,

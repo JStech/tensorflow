@@ -26,21 +26,6 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import math_ops
 
 
-_multinomial_prob_note = """
-For each batch of counts `[n_1,...,n_k]`, `P[counts]` is the probability
-that after sampling `n` draws from this Multinomial distribution, the
-number of draws falling in class `j` is `n_j`.  Note that different
-sequences of draws can result in the same counts, thus the probability
-includes a combinatorial coefficient.
-
-Note that input "counts" must be a non-negative tensor with dtype `dtype`
-and whose shape can be broadcast with `self.p` and `self.n`.  For fixed
-leading dimensions, the last dimension represents counts for the
-corresponding Multinomial distribution in `self.p`. `counts` is only legal
-if it sums up to `n` and its components are equal to integer values.
-"""
-
-
 class Multinomial(distribution.Distribution):
   """Multinomial distribution.
 
@@ -107,8 +92,8 @@ class Multinomial(distribution.Distribution):
                n,
                logits=None,
                p=None,
-               validate_args=False,
-               allow_nan_stats=True,
+               validate_args=True,
+               allow_nan_stats=False,
                name="Multinomial"):
     """Initialize a batch of Multinomial distributions.
 
@@ -120,17 +105,16 @@ class Multinomial(distribution.Distribution):
       logits: Floating point tensor representing the log-odds of a
         positive event with shape broadcastable to `[N1,..., Nm, k], m >= 0`,
         and the same dtype as `n`. Defines this as a batch of `N1 x ... x Nm`
-        different `k` class Multinomial distributions. Only one of `logits` or
-        `p` should be passed in.
+        different `k` class Multinomial distributions.
       p:  Positive floating point tensor with shape broadcastable to
         `[N1,..., Nm, k]` `m >= 0` and same dtype as `n`.  Defines this as
         a batch of `N1 x ... x Nm` different `k` class Multinomial
         distributions. `p`'s components in the last portion of its shape should
-        sum up to 1. Only one of `logits` or `p` should be passed in.
-      validate_args: `Boolean`, default `False`.  Whether to assert valid
-        values for parameters `n` and `p`, and `x` in `prob` and `log_prob`.
-        If `False`, correct behavior is not guaranteed.
-      allow_nan_stats: `Boolean`, default `True`.  If `False`, raise an
+        sum up to 1.
+      validate_args: Whether to assert valid values for parameters `n` and `p`,
+        and `x` in `prob` and `log_prob`.  If `False`, correct behavior is not
+        guaranteed.
+      allow_nan_stats:  Boolean, default `False`.  If `False`, raise an
         exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member.  If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
@@ -152,7 +136,7 @@ class Multinomial(distribution.Distribution):
     self._logits, self._p = distribution_util.get_logits_and_prob(
         name=name, logits=logits, p=p, validate_args=validate_args,
         multidimensional=True)
-    with ops.name_scope(name, values=[n, self._p]) as ns:
+    with ops.name_scope(name, values=[n, self._p]):
       with ops.control_dependencies([
           check_ops.assert_non_negative(
               n, message="n has negative components."),
@@ -160,21 +144,20 @@ class Multinomial(distribution.Distribution):
               n, message="n has non-integer components.")
       ] if validate_args else []):
         self._n = array_ops.identity(n, name="convert_n")
-        self._mean_val = array_ops.expand_dims(n, -1) * self._p
-        self._broadcast_shape = math_ops.reduce_sum(
-            self._mean_val, reduction_indices=[-1], keep_dims=False)
-        super(Multinomial, self).__init__(
-            dtype=self._p.dtype,
-            parameters={"p": self._p,
-                        "n": self._n,
-                        "mean": self._mean,
-                        "logits": self._logits,
-                        "broadcast_shape": self._broadcast_shape},
-            is_continuous=False,
-            is_reparameterized=False,
-            validate_args=validate_args,
-            allow_nan_stats=allow_nan_stats,
-            name=ns)
+        self._name = name
+
+        self._validate_args = validate_args
+        self._allow_nan_stats = allow_nan_stats
+
+        self._mean = array_ops.expand_dims(n, -1) * self._p
+        # Only used for inferring shape.
+        self._broadcast_shape = math_ops.reduce_sum(self._mean,
+                                                    reduction_indices=[-1],
+                                                    keep_dims=False)
+
+        self._get_batch_shape = self._broadcast_shape.get_shape()
+        self._get_event_shape = (
+            self._mean.get_shape().with_rank_at_least(1)[-1:])
 
   @property
   def n(self):
@@ -182,63 +165,175 @@ class Multinomial(distribution.Distribution):
     return self._n
 
   @property
+  def p(self):
+    """Event probabilities."""
+    return self._p
+
+  @property
   def logits(self):
-    """Vector of coordinatewise logits."""
+    """Log-odds."""
     return self._logits
 
   @property
-  def p(self):
-    """Vector of probabilities summing to one.
+  def name(self):
+    """Name to prepend to all ops."""
+    return self._name
 
-    Each element is the probability of drawing that coordinate."""
-    return self._p
+  @property
+  def dtype(self):
+    """dtype of samples from this distribution."""
+    return self._p.dtype
 
-  def _batch_shape(self):
-    return array_ops.shape(self._broadcast_shape)
+  @property
+  def validate_args(self):
+    """Boolean describing behavior on invalid input."""
+    return self._validate_args
 
-  def _get_batch_shape(self):
-    return self._broadcast_shape.get_shape()
+  @property
+  def allow_nan_stats(self):
+    """Boolean describing behavior when a stat is undefined for batch member."""
+    return self._allow_nan_stats
 
-  def _event_shape(self):
-    return array_ops.gather(array_ops.shape(self._mean_val),
-                            [array_ops.rank(self._mean_val) - 1])
+  def batch_shape(self, name="batch_shape"):
+    """Batch dimensions of this instance as a 1-D int32 `Tensor`.
 
-  def _get_event_shape(self):
-    return self._mean_val.get_shape().with_rank_at_least(1)[-1:]
+    The product of the dimensions of the `batch_shape` is the number of
+    independent distributions of this kind the instance represents.
 
-  @distribution_util.AppendDocstring(_multinomial_prob_note)
-  def _log_prob(self, counts):
-    counts = self._assert_valid_sample(counts)
-    log_unnormalized_prob = math_ops.reduce_sum(
-        counts * math_ops.log(self.p),
-        reduction_indices=[-1])
-    log_normalizer = -distribution_util.log_combinations(self.n, counts)
-    return log_unnormalized_prob - log_normalizer
+    Args:
+      name: name to give to the op
 
-  @distribution_util.AppendDocstring(_multinomial_prob_note)
-  def _prob(self, counts):
-    return math_ops.exp(self._log_prob(counts))
+    Returns:
+      `Tensor` `batch_shape`
+    """
+    with ops.name_scope(self.name):
+      with ops.name_scope(name, values=[self._broadcast_shape]):
+        return array_ops.shape(self._broadcast_shape)
 
-  def _mean(self):
-    return array_ops.identity(self._mean_val)
+  def get_batch_shape(self):
+    """`TensorShape` available at graph construction time.
 
-  def _variance(self):
-    p = self.p * array_ops.expand_dims(array_ops.ones_like(self.n), -1)
-    outer_prod = math_ops.batch_matmul(
-        array_ops.expand_dims(self._mean_val, -1),
-        array_ops.expand_dims(p, -2))
-    return array_ops.matrix_set_diag(-outer_prod,
-                                     self._mean_val - self._mean_val * p)
+    Same meaning as `batch_shape`. May be only partially defined.
 
-  def _assert_valid_sample(self, counts):
+    Returns:
+      batch shape
+    """
+    return self._get_batch_shape
+
+  def event_shape(self, name="event_shape"):
+    """Shape of a sample from a single distribution as a 1-D int32 `Tensor`.
+
+    Args:
+      name: name to give to the op
+
+    Returns:
+      `Tensor` `event_shape`
+    """
+    with ops.name_scope(self.name):
+      with ops.name_scope(name, values=[self._mean]):
+        return array_ops.gather(array_ops.shape(self._mean),
+                                [array_ops.rank(self._mean) - 1])
+
+  def get_event_shape(self):
+    """`TensorShape` available at graph construction time.
+
+    Same meaning as `event_shape`. May be only partially defined.
+
+    Returns:
+      event shape
+    """
+    return self._get_event_shape
+
+  def mean(self, name="mean"):
+    """Mean of the distribution."""
+    with ops.name_scope(self.name):
+      return array_ops.identity(self._mean, name=name)
+
+  def variance(self, name="variance"):
+    """Variance of the distribution."""
+    with ops.name_scope(self.name):
+      with ops.name_scope(name, values=[self._n, self._p, self._mean]):
+        p = array_ops.expand_dims(
+            self._p * array_ops.expand_dims(
+                array_ops.ones_like(self._n), -1), -1)
+        variance = -math_ops.batch_matmul(
+            array_ops.expand_dims(self._mean, -1), p, adj_y=True)
+        variance += array_ops.batch_matrix_diag(self._mean)
+        return variance
+
+  def log_prob(self, counts, name="log_prob"):
+    """`Log(P[counts])`, computed for every batch member.
+
+    For each batch of counts `[n_1,...,n_k]`, `P[counts]` is the probability
+    that after sampling `n` draws from this Multinomial distribution, the
+    number of draws falling in class `j` is `n_j`.  Note that different
+    sequences of draws can result in the same counts, thus the probability
+    includes a combinatorial coefficient.
+
+    Args:
+      counts:  Non-negative tensor with dtype `dtype` and whose shape can
+        be broadcast with `self.p` and `self.n`.  For fixed leading dimensions,
+        the last dimension represents counts for the corresponding Multinomial
+        distribution in `self.p`. `counts` is only legal if it sums up to `n`
+        and its components are equal to integer values.
+      name:  Name to give this Op, defaults to "log_prob".
+
+    Returns:
+      Log probabilities for each record, shape `[N1,...,Nm]`.
+    """
+    n = self._n
+    p = self._p
+    with ops.name_scope(self.name):
+      with ops.name_scope(name, values=[n, p, counts]):
+        counts = self._check_counts(counts)
+
+        prob_prob = math_ops.reduce_sum(counts * math_ops.log(self._p),
+                                        reduction_indices=[-1])
+        log_prob = prob_prob + distribution_util.log_combinations(
+            n, counts)
+        return log_prob
+
+  def prob(self, counts, name="prob"):
+    """`P[counts]`, computed for every batch member.
+
+    For each batch of counts `[n_1,...,n_k]`, `P[counts]` is the probability
+    that after sampling `n` draws from this Multinomial distribution, the
+    number of draws falling in class `j` is `n_j`.  Note that different
+    sequences of draws can result in the same counts, thus the probability
+    includes a combinatorial coefficient.
+
+    Args:
+      counts:  Non-negative tensor with dtype `dtype` and whose shape can
+        be broadcast with `self.p` and `self.n`.  For fixed leading dimensions,
+        the last dimension represents counts for the corresponding Multinomial
+        distribution in `self.p`. `counts` is only legal if it sums up to `n`
+        and its components are equal to integer values.
+      name:  Name to give this Op, defaults to "prob".
+
+    Returns:
+      Probabilities for each record, shape `[N1,...,Nm]`.
+    """
+    return super(Multinomial, self).prob(counts, name=name)
+
+  @property
+  def is_continuous(self):
+    return False
+
+  @property
+  def is_reparameterized(self):
+    return False
+
+  def _check_counts(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
-    if not self.validate_args: return counts
+    counts = ops.convert_to_tensor(counts, name="counts_before_deps")
+    candidate_n = math_ops.reduce_sum(counts, reduction_indices=[-1])
+    if not self.validate_args:
+      return counts
+
     return control_flow_ops.with_dependencies([
         check_ops.assert_non_negative(
             counts, message="counts has negative components."),
         check_ops.assert_equal(
-            self.n, math_ops.reduce_sum(counts, reduction_indices=[-1]),
-            message="counts do not sum to n."),
+            self._n, candidate_n, message="counts do not sum to n."),
         distribution_util.assert_integer_form(
-            counts, message="counts have non-integer components.")
-    ], counts)
+            counts, message="counts have non-integer components.")], counts)

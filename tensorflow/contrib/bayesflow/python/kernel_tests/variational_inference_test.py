@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-st = tf.contrib.bayesflow.stochastic_tensor
+sg = tf.contrib.bayesflow.stochastic_graph
 vi = tf.contrib.bayesflow.variational_inference
 distributions = tf.contrib.distributions
 
@@ -43,7 +43,7 @@ def generative_net(z, data_size):
 def mini_vae():
   x = [[-6., 3., 6.], [-8., 4., 8.]]
   prior = distributions.Normal(mu=0., sigma=1.)
-  variational = st.StochasticTensor(
+  variational = sg.DistributionTensor(
       distributions.Normal, mu=inference_net(x, 1), sigma=1.)
   vi.register_prior(variational, prior)
   px = distributions.Normal(mu=generative_net(variational, 3), sigma=1.)
@@ -100,7 +100,7 @@ class VariationalInferenceTest(tf.test.TestCase):
     x = tf.constant([[-6., 3., 6.]])
 
     prior = distributions.Bernoulli(0.5)
-    variational = st.StochasticTensor(
+    variational = sg.DistributionTensor(
         NormalNoEntropy, mu=inference_net(x, 1), sigma=1.)
     vi.register_prior(variational, prior)
     px = distributions.Normal(mu=generative_net(variational, 3), sigma=1.)

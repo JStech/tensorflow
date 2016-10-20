@@ -20,14 +20,14 @@ limitations under the License.
 namespace tensorflow {
 
 using shape_inference::InferenceContext;
-using shape_inference::ShapeHandle;
+using shape_inference::Shape;
 
 // --------------------------------------------------------------------------
 namespace {
 Status SwitchShape(InferenceContext* c) {
-  ShapeHandle unused;
+  const Shape* unused;
   TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 0, &unused));
-  ShapeHandle out = c->input(0);
+  const Shape* out = c->input(0);
   c->set_output(0, out);
   c->set_output(1, out);
   return Status::OK();
@@ -85,16 +85,16 @@ REGISTER_OP("RefSelect")
     .Attr("T: type")
     .Attr("N: int >= 1")
     .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle unused;
+      const Shape* unused;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 0, &unused));
-      ShapeHandle first_input = c->input(1);
+      const Shape* first_input = c->input(1);
       if (!c->FullyDefined(first_input)) {
         c->set_output(0, c->UnknownShape());
         return Status::OK();
       }
       // If any inputs aren't fully defined or don't match, we return unknown.
       for (int i = 2; i < c->num_inputs(); ++i) {
-        ShapeHandle input = c->input(i);
+        const Shape* input = c->input(i);
         if (!c->FullyDefined(input) ||
             !c->Merge(first_input, input, &unused).ok()) {
           c->set_output(0, c->UnknownShape());
@@ -115,13 +115,13 @@ output: The forwarded tensor.
 // --------------------------------------------------------------------------
 namespace {
 Status MergeShape(InferenceContext* c) {
-  ShapeHandle out = c->input(0);
+  const Shape* out = c->input(0);
   if (!c->RankKnown(out)) {
     out = c->UnknownShape();
   } else {
     int32 rank = c->Rank(out);
     for (int i = 1; i < c->num_inputs(); ++i) {
-      ShapeHandle input = c->input(i);
+      const Shape* input = c->input(i);
       if (c->Rank(input) != rank) {
         out = c->UnknownShape();
         break;
@@ -190,7 +190,7 @@ REGISTER_OP("Enter")
     .Attr("frame_name: string")
     .Attr("is_constant: bool = false")
     .Attr("parallel_iterations: int = 10")
-    .SetShapeFn(shape_inference::UnknownShape)
+    .SetShapeFn(shape_inference::UnchangedShape)
     .Doc(R"doc(
 Creates or finds a child frame, and makes `data` available to the child frame.
 

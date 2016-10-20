@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/stream_executor/cuda/cuda_diagnostics.h"
 
+#include <dirent.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -24,14 +25,11 @@ limitations under the License.
 #include <IOKit/kext/KextManager.h>
 #include <mach-o/dyld.h>
 #else
-#if !defined(PLATFORM_WINDOWS)
-#include <dirent.h>
 #include <link.h>
-#include <sys/sysmacros.h>
-#include <unistd.h>
-#endif
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #endif
+#include <unistd.h>
 #include <algorithm>
 #include <memory>
 #include <vector>
@@ -137,7 +135,7 @@ void Diagnostician::LogDiagnosticInformation() {
               << "(" << port::Hostname() << ")";
   }
   CFRelease(kext_infos);
-#elif !defined(PLATFORM_WINDOWS)
+#else
   if (access(kDriverVersionPath, F_OK) != 0) {
     LOG(INFO) << "kernel driver does not appear to be running on this host "
               << "(" << port::Hostname() << "): "
@@ -160,7 +158,7 @@ void Diagnostician::LogDiagnosticInformation() {
 
 /* static */ void Diagnostician::LogDriverVersionInformation() {
   LOG(INFO) << "hostname: " << port::Hostname();
-#ifndef PLATFORM_WINDOWS
+
   if (VLOG_IS_ON(1)) {
     const char *value = getenv("LD_LIBRARY_PATH");
     string library_path = value == nullptr ? "" : value;
@@ -182,17 +180,17 @@ void Diagnostician::LogDiagnosticInformation() {
       closedir(dir);
     }
   }
+
   port::StatusOr<DriverVersion> dso_version = FindDsoVersion();
   LOG(INFO) << "libcuda reported version is: "
             << DriverVersionStatusToString(dso_version);
 
   port::StatusOr<DriverVersion> kernel_version = FindKernelDriverVersion();
   LOG(INFO) << "kernel reported version is: "
-	  << DriverVersionStatusToString(kernel_version);
-#endif
+            << DriverVersionStatusToString(kernel_version);
 
   // OS X kernel driver does not report version accurately
-#if !defined(__APPLE__) && !defined(PLATFORM_WINDOWS)
+#if !defined(__APPLE__)
   if (kernel_version.ok() && dso_version.ok()) {
     WarnOnDsoKernelMismatch(dso_version, kernel_version);
   }
@@ -229,7 +227,6 @@ port::StatusOr<DriverVersion> Diagnostician::FindDsoVersion() {
       result = StringToDriverVersion(version);
     }
 #else
-#if !defined(PLATFORM_WINDOWS)
   // Callback used when iterating through DSOs. Looks for the driver-interfacing
   // DSO and yields its version number into the callback data, when found.
   auto iterate_phdr =
@@ -261,7 +258,6 @@ port::StatusOr<DriverVersion> Diagnostician::FindDsoVersion() {
   };
 
   dl_iterate_phdr(iterate_phdr, &result);
-#endif
 #endif
 
   return result;

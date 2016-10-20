@@ -102,11 +102,12 @@ RandomShuffleQueue::RandomShuffleQueue(
 }
 
 Status RandomShuffleQueue::Initialize() {
-  TF_RETURN_IF_ERROR(TypedQueue::Initialize());
+  Status s = TypedQueue::Initialize();
+  if (!s.ok()) return s;
 
   mutex_lock lock(mu_);
   for (int i = 0; i < num_components(); ++i) {
-    queues_[i].reserve(min_after_dequeue_);
+    queues_.back().reserve(min_after_dequeue_);
   }
   return Status::OK();
 }
@@ -136,7 +137,7 @@ void RandomShuffleQueue::TryEnqueue(const Tuple& tuple, OpKernelContext* ctx,
           1, callback, ctx, cm, token,
           [tuple, this](Attempt* attempt) EXCLUSIVE_LOCKS_REQUIRED(mu_) {
             if (closed_) {
-              attempt->context->SetStatus(errors::Cancelled(
+              attempt->context->SetStatus(errors::Aborted(
                   "RandomShuffleQueue '", name_, "' is closed."));
               return kComplete;
             }
@@ -194,7 +195,7 @@ void RandomShuffleQueue::TryEnqueueMany(const Tuple& tuple,
           batch_size, callback, ctx, cm, token,
           [tuple, this](Attempt* attempt) EXCLUSIVE_LOCKS_REQUIRED(mu_) {
             if (closed_) {
-              attempt->context->SetStatus(errors::Cancelled(
+              attempt->context->SetStatus(errors::Aborted(
                   "RandomShuffleQueue '", name_, "' is closed."));
               return kComplete;
             }

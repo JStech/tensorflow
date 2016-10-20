@@ -1,4 +1,4 @@
-/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2016 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,6 @@ limitations under the License.
 #include "google/protobuf/any.pb.h"
 #include "tensorflow/contrib/session_bundle/signature.h"
 #include "tensorflow/contrib/session_bundle/test_util.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/example/feature.pb.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_testutil.h"
@@ -41,8 +39,6 @@ namespace {
 
 // Constants for the export path and file-names.
 const char kExportPath[] = "session_bundle/example/half_plus_two/00000123";
-const char kExportCheckpointV2Path[] =
-    "session_bundle/example/half_plus_two_ckpt_v2/00000123";
 const char kMetaGraphDefFilename[] = "export.meta";
 const char kVariablesFilename[] = "export-00000-of-00001";
 
@@ -78,63 +74,6 @@ Status CopyExport(const string& export_path, const string& variables_filename,
   return Status::OK();
 }
 
-string MakeSerializedExample(float x) {
-  tensorflow::Example example;
-  auto* feature_map = example.mutable_features()->mutable_feature();
-  (*feature_map)["x"].mutable_float_list()->add_value(x);
-  return example.SerializeAsString();
-}
-
-void CheckRegressionSignature(const Signatures& signatures,
-                              const SessionBundle& bundle) {
-  // Recover the Tensor names of our inputs and outputs.
-  ASSERT_TRUE(signatures.default_signature().has_regression_signature());
-  const RegressionSignature regression_signature =
-      signatures.default_signature().regression_signature();
-
-  const string input_name = regression_signature.input().tensor_name();
-  const string output_name = regression_signature.output().tensor_name();
-
-  // Validate the half plus two behavior.
-  std::vector<string> serialized_examples;
-  for (float x : {0, 1, 2, 3}) {
-    serialized_examples.push_back(MakeSerializedExample(x));
-  }
-  Tensor input = test::AsTensor<string>(serialized_examples, TensorShape({4}));
-  std::vector<Tensor> outputs;
-  TF_ASSERT_OK(
-      bundle.session->Run({{input_name, input}}, {output_name}, {}, &outputs));
-  ASSERT_EQ(outputs.size(), 1);
-  test::ExpectTensorEqual<float>(
-      outputs[0], test::AsTensor<float>({2, 2.5, 3, 3.5}, TensorShape({4, 1})));
-}
-
-void CheckNamedSignatures(const Signatures& signatures,
-                          const SessionBundle& bundle) {
-  // Recover the Tensor names of our inputs and outputs.
-  const string input_name = signatures.named_signatures()
-                                .at("inputs")
-                                .generic_signature()
-                                .map()
-                                .at("x")
-                                .tensor_name();
-  const string output_name = signatures.named_signatures()
-                                 .at("outputs")
-                                 .generic_signature()
-                                 .map()
-                                 .at("y")
-                                 .tensor_name();
-
-  // Validate the half plus two behavior.
-  Tensor input = test::AsTensor<float>({0, 1, 2, 3}, TensorShape({4, 1}));
-  std::vector<Tensor> outputs;
-  TF_ASSERT_OK(
-      bundle.session->Run({{input_name, input}}, {output_name}, {}, &outputs));
-  ASSERT_EQ(outputs.size(), 1);
-  test::ExpectTensorEqual<float>(
-      outputs[0], test::AsTensor<float>({2, 2.5, 3, 3.5}, TensorShape({4, 1})));
-}
-
 void CheckSessionBundle(const string& export_path,
                         const SessionBundle& bundle) {
   const string asset_path = io::JoinPath(export_path, kAssetsDirectory);
@@ -154,10 +93,25 @@ void CheckSessionBundle(const string& export_path,
                              TensorShape({})),
       path_outputs[1]);
 
+  // Validate the half plus two behavior.
+  Tensor input = test::AsTensor<float>({0, 1, 2, 3}, TensorShape({4, 1}));
+
+  // Recover the Tensor names of our inputs and outputs.
   Signatures signatures;
   TF_ASSERT_OK(GetSignatures(bundle.meta_graph_def, &signatures));
-  CheckRegressionSignature(signatures, bundle);
-  CheckNamedSignatures(signatures, bundle);
+  ASSERT_TRUE(signatures.default_signature().has_regression_signature());
+  const RegressionSignature regression_signature =
+      signatures.default_signature().regression_signature();
+
+  const string input_name = regression_signature.input().tensor_name();
+  const string output_name = regression_signature.output().tensor_name();
+
+  std::vector<Tensor> outputs;
+  TF_ASSERT_OK(
+      bundle.session->Run({{input_name, input}}, {output_name}, {}, &outputs));
+  ASSERT_EQ(outputs.size(), 1);
+  test::ExpectTensorEqual<float>(
+      outputs[0], test::AsTensor<float>({2, 2.5, 3, 3.5}, TensorShape({4, 1})));
 }
 
 void BasicTest(const string& export_path) {
@@ -165,18 +119,6 @@ void BasicTest(const string& export_path) {
   SessionBundle bundle;
   TF_ASSERT_OK(LoadSessionBundleFromPath(options, export_path, &bundle));
   CheckSessionBundle(export_path, bundle);
-}
-
-// Test for resource leaks when loading and unloading large numbers of
-// SessionBundles. Concurrent with adding this test, we had a leak where the
-// TensorFlow Session was not being closed, which leaked memory.
-// TODO(b/31711147): Increase the SessionBundle ResourceLeakTest iterations and
-// move outside of the test suite.
-TEST(LoadSessionBundleFromPath, ResourceLeakTest) {
-  const string export_path = test_util::TestSrcDirPath(kExportPath);
-  for (int i = 0; i < 100; i++) {
-    BasicTest(export_path);
-  }
 }
 
 TEST(LoadSessionBundleFromPath, BasicTensorFlowContrib) {
@@ -254,16 +196,6 @@ TEST(LoadSessionBundleFromPath, BadExportPath) {
   EXPECT_TRUE(msg.find("Not found") != std::string::npos) << msg;
 }
 
-TEST(CheckpointV2Test, LoadSessionBundleFromPath) {
-  const string export_path = test_util::TestSrcDirPath(kExportCheckpointV2Path);
-  BasicTest(export_path);
-}
-
-TEST(CheckpointV2Test, IsPossibleExportDirectory) {
-  const string export_path = test_util::TestSrcDirPath(kExportCheckpointV2Path);
-  EXPECT_TRUE(IsPossibleExportDirectory(export_path));
-}
-
 class SessionBundleTest : public ::testing::Test {
  protected:
   // Copy the half_plus_two graph and apply the twiddler to rewrite the
@@ -307,7 +239,7 @@ TEST_F(SessionBundleTest, UnshardedVariableFile) {
   BasicTest(export_path);
 }
 
-TEST_F(SessionBundleTest, ServingGraphEmpty) {
+TEST_F(SessionBundleTest, ServingGraph_Empty) {
   const string path = SetupExport([](MetaGraphDef* def) {
     (*def->mutable_collection_def())[kGraphKey].clear_any_list();
   });
@@ -318,7 +250,7 @@ TEST_F(SessionBundleTest, ServingGraphEmpty) {
       << status_.error_message();
 }
 
-TEST_F(SessionBundleTest, ServingGraphAnyIncorrectType) {
+TEST_F(SessionBundleTest, ServingGraphAny_IncorrectType) {
   const string path = SetupExport([](MetaGraphDef* def) {
     // Pack an unexpected type in the GraphDef Any.
     (*def->mutable_collection_def())[kGraphKey].clear_any_list();
@@ -334,7 +266,7 @@ TEST_F(SessionBundleTest, ServingGraphAnyIncorrectType) {
       << status_.error_message();
 }
 
-TEST_F(SessionBundleTest, ServingGraphAnyValueCorrupted) {
+TEST_F(SessionBundleTest, ServingGraphAnyValue_Corrupted) {
   const string path = SetupExport([](MetaGraphDef* def) {
     // Pack an unexpected type in the GraphDef Any.
     (*def->mutable_collection_def())[kGraphKey].clear_any_list();
@@ -350,7 +282,7 @@ TEST_F(SessionBundleTest, ServingGraphAnyValueCorrupted) {
       << status_.error_message();
 }
 
-TEST_F(SessionBundleTest, AssetFileAnyIncorrectType) {
+TEST_F(SessionBundleTest, AssetFileAny_IncorrectType) {
   const string path = SetupExport([](MetaGraphDef* def) {
     // Pack an unexpected type in the AssetFile Any.
     (*def->mutable_collection_def())[kAssetsKey].clear_any_list();
@@ -363,11 +295,12 @@ TEST_F(SessionBundleTest, AssetFileAnyIncorrectType) {
   EXPECT_FALSE(status_.ok());
   EXPECT_TRUE(
       StringPiece(status_.error_message())
-          .contains("Expected Any type_url for: tensorflow.serving.AssetFile"))
+          .contains(
+              "Expected asset Any type_url for: tensorflow.serving.AssetFile"))
       << status_.error_message();
 }
 
-TEST_F(SessionBundleTest, AssetFileAnyValueCorrupted) {
+TEST_F(SessionBundleTest, AssetFileAny_ValueCorrupted) {
   const string path = SetupExport([](MetaGraphDef* def) {
     // Pack an unexpected type in the AssetFile Any.
     (*def->mutable_collection_def())[kAssetsKey].clear_any_list();
@@ -383,7 +316,7 @@ TEST_F(SessionBundleTest, AssetFileAnyValueCorrupted) {
       << status_.error_message();
 }
 
-TEST_F(SessionBundleTest, InitOpTooManyValues) {
+TEST_F(SessionBundleTest, InitOp_TooManyValues) {
   const string path = SetupExport([](MetaGraphDef* def) {
     // Pack multiple init ops in to the collection.
     (*def->mutable_collection_def())[kInitOpKey].clear_node_list();

@@ -17,12 +17,9 @@ limitations under the License.
 
 namespace tensorflow {
 
-#define REGISTER_CPU_KERNELS(type)        \
-  REGISTER_KERNEL_BUILDER(                \
-      Name("Sum")                         \
-          .Device(DEVICE_CPU)             \
-          .TypeConstraint<type>("T")      \
-          .TypeConstraint<int32>("Tidx"), \
+#define REGISTER_CPU_KERNELS(type)                              \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("Sum").Device(DEVICE_CPU).TypeConstraint<type>("T"), \
       ReductionOp<CPUDevice, type, Eigen::internal::SumReducer<type>>);
 TF_CALL_REAL_NUMBER_TYPES(REGISTER_CPU_KERNELS);
 // NOTE: We should have mean(complex64,int32), too. But that needs to
@@ -39,7 +36,6 @@ TF_CALL_complex128(REGISTER_CPU_KERNELS);
       Name("Sum")                           \
           .Device(DEVICE_GPU)               \
           .TypeConstraint<type>("T")        \
-          .TypeConstraint<int32>("Tidx")    \
           .HostMemory("reduction_indices"), \
       ReductionOp<GPUDevice, type, Eigen::internal::SumReducer<type>>);
 REGISTER_GPU_KERNELS(Eigen::half);
@@ -56,7 +52,6 @@ REGISTER_KERNEL_BUILDER(
     Name("Sum")
         .Device(DEVICE_GPU)
         .TypeConstraint<int32>("T")
-        .TypeConstraint<int32>("Tidx")
         .HostMemory("input")
         .HostMemory("output")
         .HostMemory("reduction_indices"),
