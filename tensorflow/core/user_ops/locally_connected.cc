@@ -15,9 +15,9 @@ namespace tensorflow {
           filter.shape().DebugString()));
 
     OP_REQUIRES(
-        context, input.dim_size(3) == filter.dim_size(4),
+        context, input.dim_size(3) == filter.dim_size(5),
         errors::InvalidArgument("input and filter must have the same depth: ",
-          input.dim_size(3), " vs ", filter.dim_size(4)));
+          input.dim_size(3), " vs ", filter.dim_size(5)));
 
     if (gradients != nullptr) {
       OP_REQUIRES(context, gradients->dims() == 4,
@@ -31,11 +31,11 @@ namespace tensorflow {
       OP_REQUIRES(context,
           filter.dim_size(0) == gradients->dim_size(1) &&
           filter.dim_size(1) == gradients->dim_size(2) &&
-          filter.dim_size(5) == gradients->dim_size(3),
+          filter.dim_size(2) == gradients->dim_size(3),
           errors::InvalidArgument("height, width, and depth of filter and gradients must match: ",
             filter.dim_size(0), " vs ", gradients->dim_size(1), " and ",
             filter.dim_size(1), " vs ", gradients->dim_size(2), " and ",
-            filter.dim_size(5), " vs ", gradients->dim_size(3)));
+            filter.dim_size(2), " vs ", gradients->dim_size(3)));
     }
   }
 
@@ -49,13 +49,13 @@ REGISTER_OP("LocConn")
 Computes a 2-D locally connected layer given 4-D `input` and 6-D `filter` tensors.
 
 Given an input tensor of shape `[batch, in_height, in_width, in_channels]`
-and a filter tensor of shape `[out_height, out_width, filter_height,
-filter_width, in_channels, out_channels]`, this op calculates an output tensor
+and a filter tensor of shape `[out_height, out_width, out_channels,
+filter_height, filter_width, in_channels]`, this op calculates an output tensor
 of shape `[batch, out_height, out_width, out_channels]` where each element is
 calculated as follows,
 
     output[b, i, j, c] = sum over f_i, f_j, f_c (
-      filter[i, j, f_i, f_j, f_c, c] * input[b, pos_i+f_i, pos_j+f_j, f_c])
+      filter[i, j, c, f_i, f_j, f_c] * input[b, pos_i+f_i, pos_j+f_j, f_c])
 
 The `pos_i` and `pos_j` values are rounded multiples of a potentially
 non-integer stride. The filters at the four corners of the output are
@@ -82,11 +82,11 @@ class LocConnOp : public OpKernel {
       const int64 batch = input.dim_size(0);
       const int out_height = static_cast<int>(filter.dim_size(0));
       const int out_width = static_cast<int>(filter.dim_size(1));
-      const int out_depth = static_cast<int>(filter.dim_size(5));
+      const int out_depth = static_cast<int>(filter.dim_size(2));
 
       // filter dimensions
-      const int filter_height = static_cast<int>(filter.dim_size(2));
-      const int filter_width = static_cast<int>(filter.dim_size(3));
+      const int filter_height = static_cast<int>(filter.dim_size(3));
+      const int filter_width = static_cast<int>(filter.dim_size(4));
 
       // Create an output tensor
       Tensor* output = NULL;
@@ -119,7 +119,7 @@ class LocConnOp : public OpKernel {
                   int in_i = ceil(h_stride * i + fi);
                   int in_j = ceil(w_stride * j + fj);
                   for (int fk=0; fk<in_depth; fk++) {
-                    sum += filter.tensor<float, 6>()(i, j, fi, fj, fk, k) * input.tensor<float, 4>()(b, in_i, in_j, fk);
+                    sum += filter.tensor<float, 6>()(i, j, k, fi, fj, fk) * input.tensor<float, 4>()(b, in_i, in_j, fk);
                   }
                 }
               }
@@ -170,10 +170,10 @@ class LocConnGradOp : public OpKernel {
       const int64 in_width = input.dim_size(2);
       const int64 out_height = filter.dim_size(0);
       const int64 out_width = filter.dim_size(1);
-      const int64 filter_height = filter.dim_size(2);
-      const int64 filter_width = filter.dim_size(3);
-      const int64 in_channels = filter.dim_size(4);
-      const int64 out_channels = filter.dim_size(5);
+      const int64 out_channels = filter.dim_size(2);
+      const int64 filter_height = filter.dim_size(3);
+      const int64 filter_width = filter.dim_size(4);
+      const int64 in_channels = filter.dim_size(5);
 
       float h_stride = (in_height - filter_height + 1.)/out_height;
       float w_stride = (in_width - filter_width + 1.)/out_width;
@@ -203,9 +203,9 @@ class LocConnGradOp : public OpKernel {
                       input.tensor<float, 4>()(b, in_i, in_j, fk);
                     gradient_input->tensor<float, 4>()(b, in_i, in_j, fk) +=
                       gradients.tensor<float, 4>()(b, i, j, k) *
-                      filter.tensor<float, 6>()(i, j, fi, fj, fk, k);
+                      filter.tensor<float, 6>()(i, j, k, fi, fj, fk);
                   }
-                  gradient_filter->tensor<float, 6>()(i, j, fi, fj, fk, k) = sum;
+                  gradient_filter->tensor<float, 6>()(i, j, k, fi, fj, fk) = sum;
                 }
               }
             }

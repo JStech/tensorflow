@@ -26,56 +26,56 @@ g_t = [[
 # a 2x2 array of 3x3x1x1 filters
 f = [
     [
-      [
-        [[[0.]], [[0.]], [[0.]]],
-        [[[0.]], [[1.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]]
-        ],
-      [
-        [[[0.]], [[0.]], [[0.]]],
-        [[[1.]], [[0.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]]
-        ]
+      [[
+        [[0.], [0.], [0.]],
+        [[0.], [1.], [0.]],
+        [[0.], [0.], [0.]]
+        ]],
+      [[
+        [[0.], [0.], [0.]],
+        [[1.], [0.], [0.]],
+        [[0.], [0.], [0.]]
+        ]]
       ],
     [
-      [
-        [[[0.]], [[1.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]]
-        ],
-      [
-        [[[1.]], [[0.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]],
-        [[[0.]], [[0.]], [[0.]]]
-        ]
+      [[
+        [[0.], [1.], [0.]],
+        [[0.], [0.], [0.]],
+        [[0.], [0.], [0.]]
+        ]],
+      [[
+        [[1.], [0.], [0.]],
+        [[0.], [0.], [0.]],
+        [[0.], [0.], [0.]]
+        ]]
       ]
     ]
-f_shape = [2, 2, 3, 3, 1, 1]
+f_shape = [2, 2, 1, 3, 3, 1]
 
 g_f = [
     [
-      [
-        [[[ 1.]], [[ 2.]], [[ 3.]]],
-        [[[ 5.]], [[ 6.]], [[ 7.]]],
-        [[[ 9.]], [[10.]], [[11.]]]
-        ],
-      [
-        [[[- 2.]], [[- 3.]], [[- 4.]]],
-        [[[- 6.]], [[- 7.]], [[- 8.]]],
-        [[[-10.]], [[-11.]], [[-12.]]]
+      [[
+        [[  1.], [  2.], [  3.]],
+        [[  5.], [  6.], [  7.]],
+        [[  9.], [ 10.], [ 11.]]
+        ]],
+      [[
+        [[- 2.], [- 3.], [- 4.]],
+        [[- 6.], [- 7.], [- 8.]],
+        [[-10.], [-11.], [-12.]]
         ]
-      ],
+      ]],
     [
-      [
-        [[[- 5.]], [[- 6.]], [[- 7.]]],
-        [[[- 9.]], [[-10.]], [[-11.]]],
-        [[[-13.]], [[-14.]], [[-15.]]]
-        ],
-      [
-        [[[12.]], [[14.]], [[16.]]],
-        [[[20.]], [[22.]], [[24.]]],
-        [[[28.]], [[30.]], [[32.]]]
-        ]
+      [[
+        [[- 5.], [- 6.], [- 7.]],
+        [[- 9.], [-10.], [-11.]],
+        [[-13.], [-14.], [-15.]]
+        ]],
+      [[
+        [[ 12.], [ 14.], [ 16.]],
+        [[ 20.], [ 22.], [ 24.]],
+        [[ 28.], [ 30.], [ 32.]]
+        ]]
       ]
     ]
 
@@ -102,10 +102,10 @@ def create_random_test():
             [
               [
                 random.random() + 0.1
-                for _ in range(out_channels)]
-              for _ in range(in_channels)]
-            for _ in range(filter_width)]
-          for _ in range(filter_height)]
+                for _ in range(in_channels)]
+              for _ in range(filter_width)]
+            for _ in range(filter_height)]
+          for _ in range(out_channels)]
         for _ in range(out_width)]
       for _ in range(out_height)]
 
@@ -144,7 +144,7 @@ def create_random_test():
           for f_i in range(filter_height):
             for f_j in range(filter_width):
               for f_k in range(in_channels):
-                out_tensor[b][i][j][k] += (f_tensor[i][j][f_i][f_j][f_k][k] *
+                out_tensor[b][i][j][k] += (f_tensor[i][j][k][f_i][f_j][f_k] *
                     in_tensor[b][f_i + h_pos[i]][f_j + w_pos[j]][f_k])
   return (tf.constant(f_tensor), tf.constant(in_tensor), tf.constant(out_tensor))
 
@@ -220,19 +220,19 @@ class LocConnTest(tf.test.TestCase):
           i_img[input_size[0]-output_size[0]:, input_size[1]-output_size[1]:])
       return o_img
 
-    out_t = np.zeros([output_size[0], output_size[1], filter_size[0],
-      filter_size[1], 1, 1])
+    expected_filter_t = np.zeros([output_size[0], output_size[1], 1,
+      filter_size[0], filter_size[1], 1])
     for i in range(output_size[0]):
       for j in range(output_size[1]):
         for fi in range(filter_size[0]):
           for fj in range(filter_size[1]):
             if fi in (0, 2) and fj in (0, 2):
-              out_t[i][j][fi][fj][0][0] = 1.
+              expected_filter_t[i][j][0][fi][fj][0] = 1.
 
     with self.test_session():
       x = tf.placeholder(tf.float32, shape=(None, input_size[0], input_size[1], 1))
       filter_t = tf.Variable(tf.truncated_normal(
-        [output_size[0], output_size[1], filter_size[0], filter_size[1], 1, 1],
+        [output_size[0], output_size[1], 1, filter_size[0], filter_size[1], 1],
         stddev=0.2))
       y = loc_conn_module.loc_conn(x, filter_t)
 
@@ -248,7 +248,7 @@ class LocConnTest(tf.test.TestCase):
         batch_ys = np.asarray([f(xs) for xs in batch_xs])
         #batch_ys = np.expand_dims(batch_ys, 3)
         train_step.run({x:batch_xs, y_:batch_ys})
-      self.assertAllClose(filter_t.eval(), out_t, rtol=1e-5, atol=1e-5)
+      self.assertAllClose(filter_t.eval(), expected_filter_t, rtol=1e-5, atol=1e-5)
 
 if __name__ == "__main__":
   tf.test.main()
